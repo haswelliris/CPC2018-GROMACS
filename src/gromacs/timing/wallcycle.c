@@ -125,6 +125,7 @@ static const char *wcsn[ewcsNR] =
     "Ewald F correction",
     "NB X buffer ops.",
     "NB F buffer ops.",
+    "Fgn's eyes",
 };
 
 gmx_bool wallcycle_have_counter(void)
