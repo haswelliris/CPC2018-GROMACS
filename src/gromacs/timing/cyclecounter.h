@@ -169,6 +169,11 @@ typedef unsigned long long
 typedef unsigned long
     gmx_cycles_t;
 
+#elif (defined SW2) || (defined SW5)
+/* fgn: this is for sw */
+typedef unsigned long
+    gmx_cycles_t;
+
 #else
 /*! \brief Integer-like datatype for cycle counter values
  *
@@ -314,6 +319,12 @@ static __inline__ int gmx_cycles_have_counter(void)
 static __inline__ int gmx_cycles_have_counter(void)
 {
     /* Solaris on SPARC*/
+    return 1;
+}
+#elif (defined SW2) || (defined SW5)
+static __inline__ int gmx_cycles_have_counter(void)
+{
+    /* fgn : add this for sw */
     return 1;
 }
 #else
@@ -537,6 +548,15 @@ static __inline gmx_cycles_t gmx_cycles_read(void)
 {
     return _rtc();
 }
+
+#elif (defined SW2) || (defined SW5)
+static __inline gmx_cycles_t gmx_cycles_read(void)
+{
+    gmx_cycles_t time;
+    asm("rtc %0": "=r" (time) : );
+    return time;
+}
+
 #else
 static gmx_cycles_t gmx_cycles_read(void)
 {
