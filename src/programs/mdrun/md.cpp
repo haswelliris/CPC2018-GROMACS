@@ -120,6 +120,12 @@
 #include "corewrap.h"
 #endif
 
+extern "C" {
+    #include "gromacs/mdlib/nbnxn_kernels/sw_subcore/SwHost.h"
+}
+extern "C" {extern void init_device();}
+extern "C" {extern void release_device();}
+
 static void reset_all_counters(FILE *fplog, t_commrec *cr,
                                gmx_int64_t step,
                                gmx_int64_t *step_rel, t_inputrec *ir,
@@ -665,6 +671,8 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
      *             Loop over MD steps
      *
      ************************************************************/
+
+    init_device();
 
     /* if rerunMD then read coordinates and velocities from input trajectory */
     if (bRerunMD)
@@ -1802,6 +1810,7 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
 
     }
     /* End of main MD loop */
+    release_device();
     debug_gmx();
 
     /* Closing TNG files can include compressing data. Therefore it is good to do that

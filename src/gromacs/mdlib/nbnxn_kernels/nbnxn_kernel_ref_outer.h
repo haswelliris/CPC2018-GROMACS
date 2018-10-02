@@ -233,11 +233,9 @@ NBK_FUNC_NAME(_VgrpF)
     l_cj = nbl->cj;
 
     ninner = 0;
-
-    athread_spawn(subcoreController, NULL);
-    athread_join();
-
-    for (n = 0; n < nbl->nci; n++)
+    host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+    notice_device();
+    for (n = nbl->nci -1; n >= 0; n--)
     {
         int i, d;
 
