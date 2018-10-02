@@ -3,10 +3,10 @@
 #include "subcore.h"
 #include <math.h>
 
-// __thread_local int core_id;
+__thread_local int subcore_id;
 
 void subcoreController(void* paras) {
-	// core_id = athread_get_id(-1);
-	// if (core_id == 0)
-	// 	printf("hello world for %d!\n", core_id);
+	subcore_id = athread_get_id(-1);
+	if (subcore_id == 0)
+		printf("hello world for %d!\n", subcore_id);
 }
