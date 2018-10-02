@@ -70,6 +70,7 @@
 #include "gromacs/utility/fatalerror.h"
 
 #include "mdrun_main.h"
+#include "athread_init_shell.h"
 
 /*! \brief Return whether either of the command-line parameters that
  *  will trigger a multi-simulation is set */
@@ -88,6 +89,7 @@ static bool is_multisim_option_set(int argc, const char *const argv[])
 //! Implements C-style main function for mdrun
 int gmx_mdrun(int argc, char *argv[])
 {
+    athread_init_shell();
     const char   *desc[] = {
         "[THISMODULE] is the main computational chemistry engine",
         "within GROMACS. Obviously, it performs Molecular Dynamics simulations,",

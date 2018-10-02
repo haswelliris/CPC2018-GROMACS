@@ -233,6 +233,10 @@ NBK_FUNC_NAME(_VgrpF)
     l_cj = nbl->cj;
 
     ninner = 0;
+
+    athread_spawn(subcoreController, NULL);
+    athread_join();
+
     for (n = 0; n < nbl->nci; n++)
     {
         int i, d;

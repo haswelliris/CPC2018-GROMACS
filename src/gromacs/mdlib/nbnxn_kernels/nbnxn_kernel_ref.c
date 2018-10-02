@@ -51,6 +51,10 @@
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/smalloc.h"
 
+#include <athread.h>
+#include "gromacs/mdlib/nbnxn_kernels/sw_subcore/subcore.h"
+extern SLAVE_FUN(subcoreController)();
+
 /*! \brief Typedefs for declaring lookup tables of kernel functions.
  */
 
