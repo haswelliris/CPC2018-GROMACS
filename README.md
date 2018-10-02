@@ -1,5 +1,21 @@
 # CPC2018-GROMACS
 cpc2018 final application : gromacs
+## 正确性校验
+算例1 ：温度，总能量3%的相对误差，压强不做要求。  
+算例2.3 温度，总能量3%的相对误差，压强10%的相对误差。  
+注意check命令只会输出误差大于1%的数值项
+### 算例1
+```
+~/online1/gmx_mpi_d check -e ~/online1/s1.edr -e2 你的输出.edr
+```
+### 算例2
+```
+~/online1/gmx_mpi_d check -e ~/online1/s2.edr -e2 你的输出.edr
+```
+### 算例3
+```
+~/online1/gmx_mpi_d check -e ~/online1/s3.edr -e2 你的输出.edr
+```
 # 神威
 ## 编译
 1. 预准备
