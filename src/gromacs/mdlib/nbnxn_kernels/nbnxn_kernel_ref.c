@@ -53,6 +53,7 @@
 
 #include "gromacs/mdlib/nbnxn_kernels/sw_subcore/SwHost.h"
 extern struct InitParam host_param;
+extern void subcore_fun();
 
 /*! \brief Typedefs for declaring lookup tables of kernel functions.
  */
