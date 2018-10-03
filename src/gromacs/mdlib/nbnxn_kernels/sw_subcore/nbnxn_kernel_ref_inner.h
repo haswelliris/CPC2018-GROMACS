@@ -150,7 +150,7 @@ else {
             npair++;
 #endif
 
-            rinv = gmx_invsqrt(rsq);
+            rinv = (1.0/sqrt(rsq));//rsqrt(rsq);
             /* 5 flops for invsqrt */
 
             /* Partially enforce the cut-off (and perhaps

@@ -1,7 +1,7 @@
 #include "nbnxn_kernel_ref_outer_fun.h"
 
 void subcore_func(
-		int macro_para,
+		int 						macro_para,
 		const nbnxn_pairlist_t		*nbl,
 		const nbnxn_atomdata_t		*nbat,
 		const interaction_const_t	*ic,
@@ -28,8 +28,8 @@ void subcore_func(
 		int							ish,
 		int 						ishf,
 		gmx_bool					do_LJ,
-		gmx_bool 					half_LJ
-		gmx_bool 					o_coul
+		gmx_bool 					half_LJ,
+		gmx_bool 					do_coul,
 		gmx_bool 					do_self,
 		int							cjind0,
 		int 						cjind1,
@@ -41,7 +41,7 @@ void subcore_func(
 		real						*fi,
 		real						*qi,
 
-		real	   					Vvdw_ci
+		real	   					Vvdw_ci,
 		real						Vc_ci,
 
 		int							egp_mask,
@@ -61,18 +61,20 @@ void subcore_func(
 
 		real	   					k_rf2,
 
-		real	   					k_rf, c_rf,
+		real	   					k_rf,
+		real						c_rf,
 
 		real						tabscale,
 
 		real						halfsp,
 
 		#ifndef GMX_DOUBLE
-			const real 				*tab_coul_FDV0
+			const real 				*tab_coul_FDV0,
 		#else
 			const real 				*tab_coul_F,
-			const real 				*tab_coul_V
+			const real 				*tab_coul_V,
 		#endif
+		int 						ninner
 
 	) {
 	for (n = nbl->nci -1; n >= 0; n--)
@@ -178,19 +180,19 @@ void subcore_func(
 			{
 				#define CALC_COULOMB
 				#define HALF_LJ
-				#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+				#include "nbnxn_kernel_ref_inner.h"
 				#undef HALF_LJ
 				#undef CALC_COULOMB
 			}
 			else if (do_coul)
 			{
 				#define CALC_COULOMB
-				#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+				#include "nbnxn_kernel_ref_inner.h"
 				#undef CALC_COULOMB
 			}
 			else
 			{
-				#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+				#include "nbnxn_kernel_ref_inner.h"
 			}
 			#undef CHECK_EXCLS
 			cjind++;
@@ -202,19 +204,19 @@ void subcore_func(
 			{
 				#define CALC_COULOMB
 				#define HALF_LJ
-				#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+				#include "nbnxn_kernel_ref_inner.h"
 				#undef HALF_LJ
 				#undef CALC_COULOMB
 			}
 			else if (do_coul)
 			{
 				#define CALC_COULOMB
-				#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+				#include "nbnxn_kernel_ref_inner.h"
 				#undef CALC_COULOMB
 			}
 			else
 			{
-				#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+				#include "nbnxn_kernel_ref_inner.h"
 			}
 		}
 		ninner += cjind1 - cjind0;

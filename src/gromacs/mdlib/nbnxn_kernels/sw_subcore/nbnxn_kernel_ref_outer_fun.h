@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <math.h>
+
 // custom define
 #define GMX_DOUBLE
 
@@ -5,6 +8,12 @@
 	typedef double real;
 #else /* GMX_DOUBLE */
 	typedef float real;
+#endif
+
+#ifdef GMX_DOUBLE
+	#define gmx_invsqrt(x)     (1.0/sqrt(x))
+#else /* single */
+	#define gmx_invsqrt(x)     (1.0/sqrtf(x))
 #endif
 
 // end of custom define
@@ -54,10 +63,15 @@
 #endif
 
 #define NBNXN_CI_SHIFT          127
+#define NBNXN_CI_DO_LJ(subc)    (1<<(7+3*(subc)))
+#define NBNXN_CI_HALF_LJ(subc)  (1<<(8+3*(subc)))
+#define NBNXN_CI_DO_COUL(subc)  (1<<(9+3*(subc)))
 
 #define XX      0 /* Defines for indexing in */
 #define YY      1 /* vectors                 */
 #define ZZ      2
+
+#define TRUE 1
 
 //-------------------------------------------------------------------------------------
 
@@ -67,6 +81,8 @@ enum {para_CALC_COUL_RF, para_CALC_COUL_TAB, para_CALC_ENERGIES, para_ENERGY_GRO
 	para_EXCL_FORCES, para_count
 };
 
+#define macro_has(para_name) ((macro_para >> para_name) & 1)
+
 // ------------------------------------------------------------------------------------
 
 // sub define for nbnxn_pairlist_t
@@ -75,7 +91,7 @@ typedef struct {
 	int dummy[16];
 } gmx_cache_protect_t;
 
-typedef void nbnxn_alloc_t (void **ptr, size_t nbytes);
+typedef void nbnxn_alloc_t (void **ptr, unsigned long long int nbytes);
 
 typedef void nbnxn_free_t (void *ptr);
 
@@ -101,6 +117,11 @@ typedef struct {
 	int		  cj;	/* The j-cluster					*/
 	unsigned int excl;  /* The exclusion (interaction) bits */
 } nbnxn_cj_t;
+
+typedef struct {
+    unsigned int imask;    /* The i-cluster interactions mask for 1 warp  */
+    int          excl_ind; /* Index into the exclusion array for 1 warp   */
+} nbnxn_im_ei_t;
 
 typedef struct {
 	int		   cj[4];   /* The 4 j-clusters							*/
@@ -216,7 +237,7 @@ typedef struct {
 /* Flags for telling if threads write to force output buffers */
 typedef struct {
 	int			   nflag;	   /* The number of flag blocks						 */
-	unsigned __int64	*flag;		/* Bit i is set when thread i writes to a cell-block */
+	unsigned long long int	*flag;		/* Bit i is set when thread i writes to a cell-block */
 	int			   flag_nalloc; /* Allocation size of cxy_flag					   */
 } nbnxn_buffer_flags_t;
 
@@ -225,6 +246,8 @@ typedef struct tMPI_Atomic
 	int value; /**< The atomic value.*/
 }
 tMPI_Atomic_t;
+
+typedef real    rvec[DIM];
 
 // end sub define of 
 
@@ -374,4 +397,3 @@ typedef struct {
 
 // -----------------------------------------------------------------------------
 
-typedef real    rvec[DIM];
