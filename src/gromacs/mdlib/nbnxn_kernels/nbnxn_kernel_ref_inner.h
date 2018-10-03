@@ -36,22 +36,34 @@
 /* When calculating RF or Ewald interactions we calculate the electrostatic
  * forces and energies on excluded atom pairs here in the non-bonded loops.
  */
-#if defined CHECK_EXCLS && (defined CALC_COULOMB || defined LJ_EWALD)
-#define EXCL_FORCES
-#endif
+
+// #if defined CHECK_EXCLS && (defined CALC_COULOMB || defined LJ_EWALD)
+// #define EXCL_FORCES
+// #endif
+if (macro_has(para_LJ_EWALD)) {
+    #if defined CHECK_EXCLS
+        macro_para |= 1 << para_EXCL_FORCES;
+    #endif
+}
+else {
+    #if defined CHECK_EXCLS && defined CALC_COULOMB
+        macro_para |= 1 << para_EXCL_FORCES;
+    #endif
+}
 
 {
     int cj;
-#ifdef ENERGY_GROUPS
+// #ifdef ENERGY_GROUPS
     int egp_cj;
-#endif
+// #endif
     int i;
 
     cj = l_cj[cjind].cj;
 
-#ifdef ENERGY_GROUPS
-    egp_cj = nbat->energrp[cj];
-#endif
+
+    if (macro_has(para_ENERGY_GROUPS))
+        egp_cj = nbat->energrp[cj];
+
     for (i = 0; i < UNROLLI; i++)
     {
         int ai;
@@ -70,22 +82,22 @@
             real rinvsq, rinvsix;
             real c6, c12;
             real FrLJ6 = 0, FrLJ12 = 0, frLJ = 0, VLJ = 0;
-#if defined LJ_FORCE_SWITCH || defined LJ_POT_SWITCH
+            // #if defined LJ_FORCE_SWITCH || defined LJ_POT_SWITCH
             real r, rsw;
-#endif
+            // #endif
 
-#ifdef CALC_COULOMB
+            #ifdef CALC_COULOMB
             real qq;
             real fcoul;
-#ifdef CALC_COUL_TAB
+            // #ifdef CALC_COUL_TAB
             real rs, frac;
             int  ri;
             real fexcl;
-#endif
-#ifdef CALC_ENERGIES
+            // #endif
+            // #ifdef CALC_ENERGIES
             real vcoul;
-#endif
-#endif
+            // #endif
+            #endif
             real fscal;
             real fx, fy, fz;
 
@@ -102,11 +114,13 @@
             int interact;
 
             interact = ((l_cj[cjind].excl>>(i*UNROLLI + j)) & 1);
-#ifndef EXCL_FORCES
-            skipmask = interact;
-#else
-            skipmask = !(cj == ci_sh && j <= i);
-#endif
+            // #ifndef EXCL_FORCES
+            if (!macro_has(para_EXCL_FORCES))
+                skipmask = interact;
+            // #else
+            else
+                skipmask = !(cj == ci_sh && j <= i);
+            // #endif
 #else
 #define interact 1.0
             skipmask = 1.0;
@@ -154,45 +168,46 @@
                 c6      = nbfp[type_i_off+type[aj]*2  ];
                 c12     = nbfp[type_i_off+type[aj]*2+1];
 
-#if defined LJ_CUT || defined LJ_FORCE_SWITCH || defined LJ_POT_SWITCH
-                rinvsix = interact*rinvsq*rinvsq*rinvsq;
-                FrLJ6   = c6*rinvsix;
-                FrLJ12  = c12*rinvsix*rinvsix;
-                frLJ    = FrLJ12 - FrLJ6;
-                /* 7 flops for r^-2 + LJ force */
-#if defined CALC_ENERGIES || defined LJ_POT_SWITCH
-                VLJ     = (FrLJ12 + c12*ic->repulsion_shift.cpot)/12 -
-                    (FrLJ6 + c6*ic->dispersion_shift.cpot)/6;
-                /* 7 flops for LJ energy */
-#endif
-#endif
+                if (macro_has(para_LJ_CUT) || macro_has(para_LJ_FORCE_SWITCH) || macro_has(para_LJ_POT_SWITCH)) {
+                    rinvsix = interact*rinvsq*rinvsq*rinvsq;
+                    FrLJ6   = c6*rinvsix;
+                    FrLJ12  = c12*rinvsix*rinvsix;
+                    frLJ    = FrLJ12 - FrLJ6;
+                    /* 7 flops for r^-2 + LJ force */
+                    if (macro_has(para_CALC_ENERGIES) || macro_has(para_LJ_POT_SWITCH)) {
+                        VLJ     = (FrLJ12 + c12*ic->repulsion_shift.cpot)/12 -
+                            (FrLJ6 + c6*ic->dispersion_shift.cpot)/6;
+                    }
+                    /* 7 flops for LJ energy */
+                }
 
-#if defined LJ_FORCE_SWITCH || defined LJ_POT_SWITCH
                 /* Force or potential switching from ic->rvdw_switch */
-                r       = rsq*rinv;
-                rsw     = r - ic->rvdw_switch;
-                rsw     = (rsw >= 0.0 ? rsw : 0.0);
-#endif
-#ifdef LJ_FORCE_SWITCH
-                frLJ   +=
-                    -c6*(ic->dispersion_shift.c2 + ic->dispersion_shift.c3*rsw)*rsw*rsw*r
-                    + c12*(ic->repulsion_shift.c2 + ic->repulsion_shift.c3*rsw)*rsw*rsw*r;
-#if defined CALC_ENERGIES
-                VLJ    +=
-                    -c6*(-ic->dispersion_shift.c2/3 - ic->dispersion_shift.c3/4*rsw)*rsw*rsw*rsw
-                    + c12*(-ic->repulsion_shift.c2/3 - ic->repulsion_shift.c3/4*rsw)*rsw*rsw*rsw;
-#endif
-#endif
+                if (macro_has(para_LJ_FORCE_SWITCH) || macro_has(para_LJ_POT_SWITCH)) {
+                    r       = rsq*rinv;
+                    rsw     = r - ic->rvdw_switch;
+                    rsw     = (rsw >= 0.0 ? rsw : 0.0);
+                }
 
-#if defined CALC_ENERGIES || defined LJ_POT_SWITCH
-                /* Masking should be done after force switching,
-                 * but before potential switching.
-                 */
-                /* Need to zero the interaction if there should be exclusion. */
-                VLJ     = VLJ * interact;
-#endif
+                if (macro_has(para_LJ_FORCE_SWITCH)) {
+                    frLJ   +=
+                        -c6*(ic->dispersion_shift.c2 + ic->dispersion_shift.c3*rsw)*rsw*rsw*r
+                        + c12*(ic->repulsion_shift.c2 + ic->repulsion_shift.c3*rsw)*rsw*rsw*r;
+                    if (macro_has(para_CALC_ENERGIES)) {
+                        VLJ    +=
+                            -c6*(-ic->dispersion_shift.c2/3 - ic->dispersion_shift.c3/4*rsw)*rsw*rsw*rsw
+                            + c12*(-ic->repulsion_shift.c2/3 - ic->repulsion_shift.c3/4*rsw)*rsw*rsw*rsw;
+                    }
+                }
 
-#ifdef LJ_POT_SWITCH
+                if (macro_has(para_CALC_ENERGIES) || macro_has(para_LJ_POT_SWITCH)) {
+                    /* Masking should be done after force switching,
+                     * but before potential switching.
+                     */
+                    /* Need to zero the interaction if there should be exclusion. */
+                    VLJ     = VLJ * interact;
+                }
+
+                if (macro_has(para_LJ_POT_SWITCH))
                 {
                     real sw, dsw;
 
@@ -202,15 +217,16 @@
                     frLJ  = frLJ*sw - r*VLJ*dsw;
                     VLJ  *= sw;
                 }
-#endif
 
-#ifdef LJ_EWALD
+                // #ifdef LJ_EWALD
+                if (macro_has(para_LJ_EWALD))
                 {
                     real c6grid, rinvsix_nm, cr2, expmcr2, poly, sh_mask;
 
-#ifdef LJ_EWALD_COMB_GEOM
-                    c6grid       = ljc[type[ai]*2]*ljc[type[aj]*2];
-#elif defined LJ_EWALD_COMB_LB
+                    if (macro_has(para_LJ_EWALD_COMB_GEOM)) {
+                        c6grid       = ljc[type[ai]*2]*ljc[type[aj]*2];
+                    }
+                    else if (macro_has(para_LJ_EWALD_COMB_LB))
                     {
                         real sigma, sigma2, epsilon;
 
@@ -221,63 +237,63 @@
                         sigma2  = sigma*sigma;
                         c6grid  = epsilon*sigma2*sigma2*sigma2;
                     }
-#else
-#error "No LJ Ewald combination rule defined"
-#endif
+                    else {
+                        printf("No LJ Ewald combination rule defined");
+                    }
 
-#ifdef CHECK_EXCLS
-                    /* Recalculate rinvsix without exclusion mask */
-                    rinvsix_nm   = rinvsq*rinvsq*rinvsq;
-#else
-                    rinvsix_nm   = rinvsix;
-#endif
+                    #ifdef CHECK_EXCLS
+                        /* Recalculate rinvsix without exclusion mask */
+                        rinvsix_nm   = rinvsq*rinvsq*rinvsq;
+                    #else
+                        rinvsix_nm   = rinvsix;
+                    #endif
                     cr2          = lje_coeff2*rsq;
-#ifdef GMX_DOUBLE
-                    expmcr2      = exp(-cr2);
-#else
-                    expmcr2      = expf(-cr2);
-#endif
+                    #ifdef GMX_DOUBLE
+                        expmcr2      = exp(-cr2);
+                    #else
+                        expmcr2      = expf(-cr2);
+                    #endif
                     poly         = 1 + cr2 + 0.5*cr2*cr2;
 
                     /* Subtract the grid force from the total LJ force */
                     frLJ        += c6grid*(rinvsix_nm - expmcr2*(rinvsix_nm*poly + lje_coeff6_6));
-#ifdef CALC_ENERGIES
-                    /* Shift should only be applied to real LJ pairs */
-                    sh_mask      = lje_vc*interact;
 
-                    VLJ         += c6grid/6*(rinvsix_nm*(1 - expmcr2*poly) + sh_mask);
-#endif
+                    if (macro_has(para_CALC_ENERGIES)) {
+                        /* Shift should only be applied to real LJ pairs */
+                        sh_mask      = lje_vc*interact;
+
+                        VLJ         += c6grid/6*(rinvsix_nm*(1 - expmcr2*poly) + sh_mask);
+                    }
+
                 }
-#endif          /* LJ_EWALD */
+                /* LJ_EWALD */
 
-#ifdef VDW_CUTOFF_CHECK
+                if (macro_has(para_VDW_CUTOFF_CHECK))
                 /* Mask for VdW cut-off shorter than Coulomb cut-off */
                 {
                     real skipmask_rvdw;
 
                     skipmask_rvdw = (rsq < rvdw2);
                     frLJ         *= skipmask_rvdw;
-#ifdef CALC_ENERGIES
-                    VLJ    *= skipmask_rvdw;
-#endif
+                    if (macro_has(para_CALC_ENERGIES))
+                        VLJ    *= skipmask_rvdw;
                 }
-#else
-#if defined CALC_ENERGIES
-                /* Need to zero the interaction if r >= rcut */
-                VLJ     = VLJ * skipmask;
-                /* 1 more flop for LJ energy */
-#endif
-#endif          /* VDW_CUTOFF_CHECK */
+                else {
+                    if (macro_has(para_CALC_ENERGIES)) {
+                        /* Need to zero the interaction if r >= rcut */
+                        VLJ     = VLJ * skipmask;
+                        /* 1 more flop for LJ energy */
+                    }
+                }
+                /* VDW_CUTOFF_CHECK */
 
-
-#ifdef CALC_ENERGIES
-#ifdef ENERGY_GROUPS
-                Vvdw[egp_sh_i[i]+((egp_cj>>(nbat->neg_2log*j)) & egp_mask)] += VLJ;
-#else
-                Vvdw_ci += VLJ;
+                if (macro_has(para_CALC_ENERGIES)) {
+                    if (macro_has(para_ENERGY_GROUPS))
+                        Vvdw[egp_sh_i[i]+((egp_cj>>(nbat->neg_2log*j)) & egp_mask)] += VLJ;
+                    else
+                        Vvdw_ci += VLJ;
                 /* 1 flop for LJ energy addition */
-#endif
-#endif
+                }
             }
 
 #ifdef CALC_COULOMB
@@ -292,51 +308,51 @@
              * advance. */
             qq = skipmask * qi[i] * q[aj];
 
-#ifdef CALC_COUL_RF
-            fcoul  = qq*(interact*rinv*rinvsq - k_rf2);
-            /* 4 flops for RF force */
-#ifdef CALC_ENERGIES
-            vcoul  = qq*(interact*rinv + k_rf*rsq - c_rf);
-            /* 4 flops for RF energy */
-#endif
-#endif
+            if (macro_has(para_CALC_COUL_RF)) {
+                fcoul  = qq*(interact*rinv*rinvsq - k_rf2);
+                /* 4 flops for RF force */
+                if (macro_has(para_CALC_ENERGIES))
+                    vcoul  = qq*(interact*rinv + k_rf*rsq - c_rf);
+                /* 4 flops for RF energy */
+            }
 
-#ifdef CALC_COUL_TAB
-            rs     = rsq*rinv*ic->tabq_scale;
-            ri     = (int)rs;
-            frac   = rs - ri;
-#ifndef GMX_DOUBLE
-            /* fexcl = F_i + frac * (F_(i+1)-F_i) */
-            fexcl  = tab_coul_FDV0[ri*4] + frac*tab_coul_FDV0[ri*4+1];
-#else
-            /* fexcl = (1-frac) * F_i + frac * F_(i+1) */
-            fexcl  = (1 - frac)*tab_coul_F[ri] + frac*tab_coul_F[ri+1];
-#endif
-            fcoul  = interact*rinvsq - fexcl;
-            /* 7 flops for float 1/r-table force */
-#ifdef CALC_ENERGIES
-#ifndef GMX_DOUBLE
-            vcoul  = qq*(interact*(rinv - ic->sh_ewald)
-                         -(tab_coul_FDV0[ri*4+2]
-                           -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
-            /* 7 flops for float 1/r-table energy (8 with excls) */
-#else
-            vcoul  = qq*(interact*(rinv - ic->sh_ewald)
-                         -(tab_coul_V[ri]
-                           -halfsp*frac*(tab_coul_F[ri] + fexcl)));
-#endif
-#endif
-            fcoul *= qq*rinv;
-#endif
+            if (macro_has(para_CALC_COUL_TAB)) {
+                rs     = rsq*rinv*ic->tabq_scale;
+                ri     = (int)rs;
+                frac   = rs - ri;
+                #ifndef GMX_DOUBLE
+                    /* fexcl = F_i + frac * (F_(i+1)-F_i) */
+                    fexcl  = tab_coul_FDV0[ri*4] + frac*tab_coul_FDV0[ri*4+1];
+                #else
+                    /* fexcl = (1-frac) * F_i + frac * F_(i+1) */
+                    fexcl  = (1 - frac)*tab_coul_F[ri] + frac*tab_coul_F[ri+1];
+                #endif
+                fcoul  = interact*rinvsq - fexcl;
+                /* 7 flops for float 1/r-table force */
 
-#ifdef CALC_ENERGIES
-#ifdef ENERGY_GROUPS
-            Vc[egp_sh_i[i]+((egp_cj>>(nbat->neg_2log*j)) & egp_mask)] += vcoul;
-#else
-            Vc_ci += vcoul;
-            /* 1 flop for Coulomb energy addition */
-#endif
-#endif
+                if (macro_has(para_CALC_ENERGIES)) {
+                    #ifndef GMX_DOUBLE
+                    vcoul  = qq*(interact*(rinv - ic->sh_ewald)
+                                 -(tab_coul_FDV0[ri*4+2]
+                                   -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
+                    /* 7 flops for float 1/r-table energy (8 with excls) */
+                    #else
+                    vcoul  = qq*(interact*(rinv - ic->sh_ewald)
+                                 -(tab_coul_V[ri]
+                                   -halfsp*frac*(tab_coul_F[ri] + fexcl)));
+                    #endif
+                }
+
+                fcoul *= qq*rinv;
+            }
+
+            if (macro_has(para_CALC_ENERGIES)) {
+                if (macro_has(para_ENERGY_GROUPS))
+                    Vc[egp_sh_i[i]+((egp_cj>>(nbat->neg_2log*j)) & egp_mask)] += vcoul;
+                else
+                    Vc_ci += vcoul;
+                /* 1 flop for Coulomb energy addition */
+            }
 #endif
 
 #ifdef CALC_COULOMB
@@ -374,4 +390,5 @@
 }
 
 #undef interact
-#undef EXCL_FORCES
+// #undef EXCL_FORCES
+macro_para &= ~(1 << para_EXCL_FORCES);

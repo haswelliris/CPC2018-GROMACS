@@ -62,7 +62,9 @@ typedef void (*p_nbk_func_noener)(const nbnxn_pairlist_t     *nbl,
                                   const interaction_const_t  *ic,
                                   rvec                       *shift_vec,
                                   real                       *f,
-                                  real                       *fshift);
+                                  real                       *fshift,
+                                  real                       *Vvdw,
+                                  real                       *Vc);
 
 typedef void (*p_nbk_func_ener)(const nbnxn_pairlist_t     *nbl,
                                 const nbnxn_atomdata_t     *nbat,
@@ -281,7 +283,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                                         ic,
                                         shift_vec,
                                         out->f,
-                                        fshift_p);
+                                        fshift_p,
+                                        out->Vvdw,
+                                        out->Vc);
         }
         else if (out->nV == 1)
         {

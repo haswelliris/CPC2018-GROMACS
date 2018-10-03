@@ -100,11 +100,11 @@ NBK_FUNC_NAME(_VgrpF)
  ,
  real                       *fshift
 #endif
-#ifdef CALC_ENERGIES
+// #ifdef CALC_ENERGIES
  ,
  real                       *Vvdw,
  real                       *Vc
-#endif
+// #endif
 )
 {
     const nbnxn_ci_t   *nbln;
@@ -115,9 +115,9 @@ NBK_FUNC_NAME(_VgrpF)
     const real         *x;
     const real         *nbfp;
     real                rcut2;
-#ifdef VDW_CUTOFF_CHECK
+// #ifdef VDW_CUTOFF_CHECK
     real                rvdw2;
-#endif
+// #endif
     int                 ntype2;
     real                facel;
     real               *nbfp_i;
@@ -131,42 +131,42 @@ NBK_FUNC_NAME(_VgrpF)
     real                fi[UNROLLI*FI_STRIDE];
     real                qi[UNROLLI];
 
-#ifdef CALC_ENERGIES
-#ifndef ENERGY_GROUPS
+// #ifdef CALC_ENERGIES
+// #ifndef ENERGY_GROUPS
 
     real       Vvdw_ci, Vc_ci;
-#else
+// #else
     int        egp_mask;
     int        egp_sh_i[UNROLLI];
-#endif
-#endif
-#ifdef LJ_POT_SWITCH
+// #endif
+// #endif
+// #ifdef LJ_POT_SWITCH
     real       swV3, swV4, swV5;
     real       swF2, swF3, swF4;
-#endif
-#ifdef LJ_EWALD
+// #endif
+// #ifdef LJ_EWALD
     real        lje_coeff2, lje_coeff6_6, lje_vc;
     const real *ljc;
-#endif
+// #endif
 
-#ifdef CALC_COUL_RF
+// #ifdef CALC_COUL_RF
     real       k_rf2;
-#ifdef CALC_ENERGIES
+// #ifdef CALC_ENERGIES
     real       k_rf, c_rf;
-#endif
-#endif
-#ifdef CALC_COUL_TAB
+// #endif
+// #endif
+// #ifdef CALC_COUL_TAB
     real       tabscale;
-#ifdef CALC_ENERGIES
+// #ifdef CALC_ENERGIES
     real       halfsp;
-#endif
+// #endif
 #ifndef GMX_DOUBLE
     const real *tab_coul_FDV0;
 #else
     const real *tab_coul_F;
     const real *tab_coul_V;
 #endif
-#endif
+// #endif
 
     int ninner;
 
@@ -237,44 +237,45 @@ NBK_FUNC_NAME(_VgrpF)
     int macro_para = 0;
     enum {para_CALC_COUL_RF, para_CALC_COUL_TAB, para_CALC_ENERGIES, para_ENERGY_GROUPS, 
         para_LJ_CUT, para_LJ_EWALD, para_LJ_EWALD_COMB_GEOM, para_LJ_EWALD_COMB_LB, 
-        para_LJ_FORCE_SWITCH, para_LJ_POT_SWITCH, para_VDW_CUTOFF_CHECK, para_count
+        para_LJ_FORCE_SWITCH, para_LJ_POT_SWITCH, para_VDW_CUTOFF_CHECK, 
+        para_EXCL_FORCES, para_count
     };
 
     #ifdef CALC_COUL_RF
-        macro_para &= 1 << para_CALC_COUL_RF;
+        macro_para |= 1 << para_CALC_COUL_RF;
     #endif
     #ifdef CALC_COUL_TAB
-        macro_para &= 1 << para_CALC_COUL_TAB;
+        macro_para |= 1 << para_CALC_COUL_TAB;
     #endif
     #ifdef CALC_ENERGIES
-        macro_para &= 1 << para_CALC_ENERGIES;
+        macro_para |= 1 << para_CALC_ENERGIES;
     #endif
     #ifdef ENERGY_GROUPS
-        macro_para &= 1 << para_ENERGY_GROUPS;
+        macro_para |= 1 << para_ENERGY_GROUPS;
     #endif
     #ifdef LJ_CUT
-        macro_para &= 1 << para_LJ_CUT;
+        macro_para |= 1 << para_LJ_CUT;
     #endif
     #ifdef LJ_EWALD
-        macro_para &= 1 << para_LJ_EWALD;
+        macro_para |= 1 << para_LJ_EWALD;
     #endif
     #ifdef LJ_EWALD_COMB_GEOM
-        macro_para &= 1 << para_LJ_EWALD_COMB_GEOM;
+        macro_para |= 1 << para_LJ_EWALD_COMB_GEOM;
     #endif
     #ifdef LJ_EWALD_COMB_LB
-        macro_para &= 1 << para_LJ_EWALD_COMB_LB;
+        macro_para |= 1 << para_LJ_EWALD_COMB_LB;
     #endif
     #ifdef LJ_FORCE_SWITCH
-        macro_para &= 1 << para_LJ_FORCE_SWITCH;
+        macro_para |= 1 << para_LJ_FORCE_SWITCH;
     #endif
     #ifdef LJ_POT_SWITCH
-        macro_para &= 1 << para_LJ_POT_SWITCH;
+        macro_para |= 1 << para_LJ_POT_SWITCH;
     #endif
     #ifdef VDW_CUTOFF_CHECK
-        macro_para &= 1 << para_VDW_CUTOFF_CHECK;
+        macro_para |= 1 << para_VDW_CUTOFF_CHECK;
     #endif
 
-    #define marco_has(para_name) ((macro_para >> para_name) & 1)
+    #define macro_has(para_name) ((macro_para >> para_name) & 1)
 
     // host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
     // notice_device()；
@@ -303,14 +304,14 @@ NBK_FUNC_NAME(_VgrpF)
         do_coul = (nbln->shift & NBNXN_CI_DO_COUL(0));
         half_LJ = ((nbln->shift & NBNXN_CI_HALF_LJ(0)) || !do_LJ) && do_coul;
 
-        if (marco_has(para_LJ_EWALD))
+        if (macro_has(para_LJ_EWALD))
             do_self = TRUE;
         else 
             do_self = do_coul;
 
 
-        if (marco_has(para_CALC_ENERGIES)) {
-            if (!marco_has(para_ENERGY_GROUPS)) {
+        if (macro_has(para_CALC_ENERGIES)) {
+            if (!macro_has(para_ENERGY_GROUPS)) {
                 Vvdw_ci = 0;
                 Vc_ci   = 0;
             }
@@ -333,15 +334,15 @@ NBK_FUNC_NAME(_VgrpF)
             qi[i] = facel*q[ci*UNROLLI+i];
         }
 
-        if (marco_has(para_CALC_ENERGIES)) {
+        if (macro_has(para_CALC_ENERGIES)) {
             if (do_self)
             {
                 real Vc_sub_self;
 
-                if (marco_has(para_CALC_COUL_RF))
+                if (macro_has(para_CALC_COUL_RF))
                     Vc_sub_self = 0.5*c_rf;
 
-                if (marco_has(para_CALC_COUL_TAB)) {
+                if (macro_has(para_CALC_COUL_TAB)) {
                     #ifdef GMX_DOUBLE
                                 Vc_sub_self = 0.5*tab_coul_V[0];
                     #else
@@ -356,7 +357,7 @@ NBK_FUNC_NAME(_VgrpF)
                     {
                         int egp_ind;
 
-                        if (marco_has(para_ENERGY_GROUPS))
+                        if (macro_has(para_ENERGY_GROUPS))
                             egp_ind = egp_sh_i[i] + ((nbat->energrp[ci]>>(i*nbat->neg_2log)) & egp_mask);
                         else
                             egp_ind = 0;
@@ -364,7 +365,7 @@ NBK_FUNC_NAME(_VgrpF)
                         /* Coulomb self interaction */
                         Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
 
-                        if (marco_has(para_LJ_EWALD)) {
+                        if (macro_has(para_LJ_EWALD)) {
                             /* LJ Ewald self interaction */
                             Vvdw[egp_ind] += 0.5*nbat->nbfp[nbat->type[ci*UNROLLI+i]*(nbat->ntype + 1)*2]/6*lje_coeff6_6;
                         }
@@ -376,26 +377,26 @@ NBK_FUNC_NAME(_VgrpF)
         cjind = cjind0;
         while (cjind < cjind1 && nbl->cj[cjind].excl != 0xffff)
         {
-#define CHECK_EXCLS
+            #define CHECK_EXCLS
             if (half_LJ)
             {
-#define CALC_COULOMB
-#define HALF_LJ
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
-#undef HALF_LJ
-#undef CALC_COULOMB
+                #define CALC_COULOMB
+                #define HALF_LJ
+                #include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+                #undef HALF_LJ
+                #undef CALC_COULOMB
             }
             else if (do_coul)
             {
-#define CALC_COULOMB
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
-#undef CALC_COULOMB
+                #define CALC_COULOMB
+                #include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+                #undef CALC_COULOMB
             }
             else
             {
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+                #include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
             }
-#undef CHECK_EXCLS
+            #undef CHECK_EXCLS
             cjind++;
         }
 
@@ -403,21 +404,21 @@ NBK_FUNC_NAME(_VgrpF)
         {
             if (half_LJ)
             {
-#define CALC_COULOMB
-#define HALF_LJ
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
-#undef HALF_LJ
-#undef CALC_COULOMB
+                #define CALC_COULOMB
+                #define HALF_LJ
+                #include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+                #undef HALF_LJ
+                #undef CALC_COULOMB
             }
             else if (do_coul)
             {
-#define CALC_COULOMB
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
-#undef CALC_COULOMB
+                #define CALC_COULOMB
+                #include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+                #undef CALC_COULOMB
             }
             else
             {
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+                #include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
             }
         }
         ninner += cjind1 - cjind0;
@@ -444,8 +445,8 @@ NBK_FUNC_NAME(_VgrpF)
         }
         // #endif
 
-        if (marco_has(para_CALC_ENERGIES)) {
-            if (!marco_has(para_ENERGY_GROUPS)) {
+        if (macro_has(para_CALC_ENERGIES)) {
+            if (!macro_has(para_ENERGY_GROUPS)) {
                 *Vvdw += Vvdw_ci;
                 *Vc   += Vc_ci;
             }
