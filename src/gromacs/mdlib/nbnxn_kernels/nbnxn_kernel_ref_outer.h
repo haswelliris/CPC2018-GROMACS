@@ -233,8 +233,51 @@ NBK_FUNC_NAME(_VgrpF)
     l_cj = nbl->cj;
 
     ninner = 0;
-    host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
-    notice_device();
+
+    int macro_para = 0;
+    enum {para_CALC_COUL_RF, para_CALC_COUL_TAB, para_CALC_ENERGIES, para_ENERGY_GROUPS, 
+        para_LJ_CUT, para_LJ_EWALD, para_LJ_EWALD_COMB_GEOM, para_LJ_EWALD_COMB_LB, 
+        para_LJ_FORCE_SWITCH, para_LJ_POT_SWITCH, para_VDW_CUTOFF_CHECK, para_count
+    };
+
+    #ifdef CALC_COUL_RF
+        macro_para &= 1 << para_CALC_COUL_RF;
+    #endif
+    #ifdef CALC_COUL_TAB
+        macro_para &= 1 << para_CALC_COUL_TAB;
+    #endif
+    #ifdef CALC_ENERGIES
+        macro_para &= 1 << para_CALC_ENERGIES;
+    #endif
+    #ifdef ENERGY_GROUPS
+        macro_para &= 1 << para_ENERGY_GROUPS;
+    #endif
+    #ifdef LJ_CUT
+        macro_para &= 1 << para_LJ_CUT;
+    #endif
+    #ifdef LJ_EWALD
+        macro_para &= 1 << para_LJ_EWALD;
+    #endif
+    #ifdef LJ_EWALD_COMB_GEOM
+        macro_para &= 1 << para_LJ_EWALD_COMB_GEOM;
+    #endif
+    #ifdef LJ_EWALD_COMB_LB
+        macro_para &= 1 << para_LJ_EWALD_COMB_LB;
+    #endif
+    #ifdef LJ_FORCE_SWITCH
+        macro_para &= 1 << para_LJ_FORCE_SWITCH;
+    #endif
+    #ifdef LJ_POT_SWITCH
+        macro_para &= 1 << para_LJ_POT_SWITCH;
+    #endif
+    #ifdef VDW_CUTOFF_CHECK
+        macro_para &= 1 << para_VDW_CUTOFF_CHECK;
+    #endif
+
+    #define marco_has(para_name) ((macro_para >> para_name) & 1)
+
+    // host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+    // notice_device()；
     for (n = nbl->nci -1; n >= 0; n--)
     {
         int i, d;
@@ -259,23 +302,25 @@ NBK_FUNC_NAME(_VgrpF)
         do_LJ   = (nbln->shift & NBNXN_CI_DO_LJ(0));
         do_coul = (nbln->shift & NBNXN_CI_DO_COUL(0));
         half_LJ = ((nbln->shift & NBNXN_CI_HALF_LJ(0)) || !do_LJ) && do_coul;
-#ifdef LJ_EWALD
-        do_self = TRUE;
-#else
-        do_self = do_coul;
-#endif
 
-#ifdef CALC_ENERGIES
-#ifndef ENERGY_GROUPS
-        Vvdw_ci = 0;
-        Vc_ci   = 0;
-#else
-        for (i = 0; i < UNROLLI; i++)
-        {
-            egp_sh_i[i] = ((nbat->energrp[ci]>>(i*nbat->neg_2log)) & egp_mask)*nbat->nenergrp;
+        if (marco_has(para_LJ_EWALD))
+            do_self = TRUE;
+        else 
+            do_self = do_coul;
+
+
+        if (marco_has(para_CALC_ENERGIES)) {
+            if (!marco_has(para_ENERGY_GROUPS)) {
+                Vvdw_ci = 0;
+                Vc_ci   = 0;
+            }
+            else {
+                for (i = 0; i < UNROLLI; i++)
+                {
+                    egp_sh_i[i] = ((nbat->energrp[ci]>>(i*nbat->neg_2log)) & egp_mask)*nbat->nenergrp;
+                }
+            }
         }
-#endif
-#endif
 
         for (i = 0; i < UNROLLI; i++)
         {
@@ -288,43 +333,45 @@ NBK_FUNC_NAME(_VgrpF)
             qi[i] = facel*q[ci*UNROLLI+i];
         }
 
-#ifdef CALC_ENERGIES
-        if (do_self)
-        {
-            real Vc_sub_self;
-
-#ifdef CALC_COUL_RF
-            Vc_sub_self = 0.5*c_rf;
-#endif
-#ifdef CALC_COUL_TAB
-#ifdef GMX_DOUBLE
-            Vc_sub_self = 0.5*tab_coul_V[0];
-#else
-            Vc_sub_self = 0.5*tab_coul_FDV0[2];
-#endif
-#endif
-
-            if (l_cj[nbln->cj_ind_start].cj == ci_sh)
+        if (marco_has(para_CALC_ENERGIES)) {
+            if (do_self)
             {
-                for (i = 0; i < UNROLLI; i++)
-                {
-                    int egp_ind;
-#ifdef ENERGY_GROUPS
-                    egp_ind = egp_sh_i[i] + ((nbat->energrp[ci]>>(i*nbat->neg_2log)) & egp_mask);
-#else
-                    egp_ind = 0;
-#endif
-                    /* Coulomb self interaction */
-                    Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+                real Vc_sub_self;
 
-#ifdef LJ_EWALD
-                    /* LJ Ewald self interaction */
-                    Vvdw[egp_ind] += 0.5*nbat->nbfp[nbat->type[ci*UNROLLI+i]*(nbat->ntype + 1)*2]/6*lje_coeff6_6;
-#endif
+                if (marco_has(para_CALC_COUL_RF))
+                    Vc_sub_self = 0.5*c_rf;
+
+                if (marco_has(para_CALC_COUL_TAB)) {
+                    #ifdef GMX_DOUBLE
+                                Vc_sub_self = 0.5*tab_coul_V[0];
+                    #else
+                                Vc_sub_self = 0.5*tab_coul_FDV0[2];
+                    #endif
+                }
+
+
+                if (l_cj[nbln->cj_ind_start].cj == ci_sh)
+                {
+                    for (i = 0; i < UNROLLI; i++)
+                    {
+                        int egp_ind;
+
+                        if (marco_has(para_ENERGY_GROUPS))
+                            egp_ind = egp_sh_i[i] + ((nbat->energrp[ci]>>(i*nbat->neg_2log)) & egp_mask);
+                        else
+                            egp_ind = 0;
+
+                        /* Coulomb self interaction */
+                        Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+
+                        if (marco_has(para_LJ_EWALD)) {
+                            /* LJ Ewald self interaction */
+                            Vvdw[egp_ind] += 0.5*nbat->nbfp[nbat->type[ci*UNROLLI+i]*(nbat->ntype + 1)*2]/6*lje_coeff6_6;
+                        }
+                    }
                 }
             }
         }
-#endif  /* CALC_ENERGIES */
 
         cjind = cjind0;
         while (cjind < cjind1 && nbl->cj[cjind].excl != 0xffff)
@@ -383,7 +430,7 @@ NBK_FUNC_NAME(_VgrpF)
                 f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
             }
         }
-#ifdef CALC_SHIFTFORCES
+        // #ifdef CALC_SHIFTFORCES
         if (fshift != NULL)
         {
             /* Add i forces to shifted force list */
@@ -395,14 +442,14 @@ NBK_FUNC_NAME(_VgrpF)
                 }
             }
         }
-#endif
+        // #endif
 
-#ifdef CALC_ENERGIES
-#ifndef ENERGY_GROUPS
-        *Vvdw += Vvdw_ci;
-        *Vc   += Vc_ci;
-#endif
-#endif
+        if (marco_has(para_CALC_ENERGIES)) {
+            if (!marco_has(para_ENERGY_GROUPS)) {
+                *Vvdw += Vvdw_ci;
+                *Vc   += Vc_ci;
+            }
+        }
     }
 
 #ifdef COUNT_PAIRS
