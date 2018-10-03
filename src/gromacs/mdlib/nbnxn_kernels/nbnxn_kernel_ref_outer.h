@@ -109,9 +109,7 @@ NBK_FUNC_NAME(_VgrpF)
     const real         *x;
     const real         *nbfp;
     real                rcut2;
-// #ifdef VDW_CUTOFF_CHECK
     real                rvdw2;
-// #endif
     int                 ntype2;
     real                facel;
     real               *nbfp_i;
@@ -125,42 +123,31 @@ NBK_FUNC_NAME(_VgrpF)
     real                fi[UNROLLI*FI_STRIDE];
     real                qi[UNROLLI];
 
-// #ifdef CALC_ENERGIES
-// #ifndef ENERGY_GROUPS
-
     real       Vvdw_ci, Vc_ci;
-// #else
+
     int        egp_mask;
     int        egp_sh_i[UNROLLI];
-// #endif
-// #endif
-// #ifdef LJ_POT_SWITCH
+
     real       swV3, swV4, swV5;
     real       swF2, swF3, swF4;
-// #endif
-// #ifdef LJ_EWALD
+
     real        lje_coeff2, lje_coeff6_6, lje_vc;
     const real *ljc;
-// #endif
 
-// #ifdef CALC_COUL_RF
     real       k_rf2;
-// #ifdef CALC_ENERGIES
+
     real       k_rf, c_rf;
-// #endif
-// #endif
-// #ifdef CALC_COUL_TAB
+
     real       tabscale;
-// #ifdef CALC_ENERGIES
+
     real       halfsp;
-// #endif
+
 #ifndef GMX_DOUBLE
     const real *tab_coul_FDV0;
 #else
     const real *tab_coul_F;
     const real *tab_coul_V;
 #endif
-// #endif
 
     int ninner;
 
@@ -273,6 +260,82 @@ NBK_FUNC_NAME(_VgrpF)
 
     // host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
     // notice_device()；
+    subcore_func(
+    	macro_para,
+    	nbl,
+		nbat,
+		ic,
+		shift_vec,
+		f,
+		fshift,
+		Vvdw,
+		Vc,
+		nbln,
+		l_cj,
+		type,
+		q,
+		shiftvec,
+		x,
+		nbfp,
+		rcut2,
+		rvdw2,
+		ntype2,
+		facel,
+		nbfp_i,
+		n,
+		ci,
+		ci_sh,
+		ish,
+		ishf,
+		do_LJ,
+		half_LJ,
+		do_coul,
+		do_self,
+		cjind0,
+		cjind1,
+		cjind,
+		ip,
+		jp,
+
+		xi,
+		fi,
+		qi,
+
+		Vvdw_ci,
+		Vc_ci,
+
+		egp_mask,
+		egp_sh_i,
+
+		swV3,
+		swV4,
+		swV5,
+		swF2,
+		swF3,
+		swF4,
+
+		lje_coeff2,
+		lje_coeff6_6,
+		lje_vc,
+		ljc,
+
+		k_rf2,
+
+		k_rf, 
+		c_rf,
+
+		tabscale,
+
+		halfsp,
+
+		#ifndef GMX_DOUBLE
+		tab_coul_FDV0,
+		#else
+		tab_coul_F,
+		tab_coul_V,
+		#endif
+		ninner
+    );
     
 
 #ifdef COUNT_PAIRS

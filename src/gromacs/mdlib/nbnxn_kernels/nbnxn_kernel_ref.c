@@ -53,7 +53,82 @@
 
 #include "gromacs/mdlib/nbnxn_kernels/sw_subcore/SwHost.h"
 extern struct InitParam host_param;
-extern void subcore_fun();
+extern void subcore_fun(
+        int,
+        const nbnxn_pairlist_t      *,
+        const nbnxn_atomdata_t      *,
+        const interaction_const_t   *,
+        rvec                        *,
+        real                        *,
+        real                        *,
+        real                        *,
+        real                        *,
+        const nbnxn_ci_t            *,
+        const nbnxn_cj_t            *,
+        const int                   *,
+        const real                  *,
+        const real                  *,
+        const real                  *,
+        const real                  *,
+        real                        ,
+        real                        ,
+        int                         ,
+        real                        ,
+        real                        *,
+        int                         ,
+        int                         ,
+        int                         ,
+        int                         ,
+        int                         ,
+        gmx_bool                    ,
+        gmx_bool                    ,
+        gmx_bool                    ,
+        gmx_bool                    ,
+        int                         ,
+        int                         ,
+        int                         ,
+        int                         ,
+        int                         ,
+
+        real                        *,
+        real                        *,
+        real                        *,
+
+        real                        ,
+        real                        ,
+
+        int                         ,
+        int                         *,
+
+        real                        ,
+        real                        ,
+        real                        ,
+        real                        ,
+        real                        ,
+        real                        ,
+
+        real                        ,
+        real                        ,
+        real                        ,
+        const real                  *,
+
+        real                        ,
+
+        real                        , 
+        real                        ,
+
+        real                        ,
+
+        real                        ,
+
+        #ifndef GMX_DOUBLE
+            const real              *,
+        #else
+            const real              *,
+            const real              *,
+        #endif
+        int
+    );
 
 /*! \brief Typedefs for declaring lookup tables of kernel functions.
  */
