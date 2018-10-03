@@ -2,79 +2,79 @@
 
 void subcore_func(
 		int 						macro_para,
-		const nbnxn_pairlist_t		*nbl,
-		const nbnxn_atomdata_t		*nbat,
-		const interaction_const_t	*ic,
-		rvec					 	*shift_vec,
-		real					 	*f,
-		real					 	*fshift,
-		real					 	*Vvdw,
-		real					 	*Vc,
-		const nbnxn_ci_t 			*nbln,
-		const nbnxn_cj_t 			*l_cj,
-		const int					*type,
-		const real					*q,
-		const real					*shiftvec,
-		const real					*x,
-		const real					*nbfp,
-		real						rcut2,
-		real						rvdw2,
-		int							ntype2,
-		real						facel,
-		real						*nbfp_i,
-		int							n,
-		int 						ci,
-		int 						ci_sh,
-		int							ish,
-		int 						ishf,
-		gmx_bool					do_LJ,
-		gmx_bool 					half_LJ,
-		gmx_bool 					do_coul,
-		gmx_bool 					do_self,
-		int							cjind0,
-		int 						cjind1,
-		int 						cjind,
-		int							ip,
-		int 						jp,
+		const nbnxn_pairlist_t		*nbl, // 会用到这个结构体里少量值
+		const nbnxn_atomdata_t		*nbat, // 会用到这个结构体里比较多的东西
+		const interaction_const_t	*ic, // 用于大量初始化，inner中也有很多使用
+		rvec					 	*shift_vec, // 不需要传入，已提取到shiftvec
+		real					 	*f, // 会被更改的量，有规约！
+		real					 	*fshift, // 会被更改的量，有规约！
+		real					 	*Vvdw, // 会被更改的量，有规约！
+		real					 	*Vc, // 会被更改的量，有规约！
+		const nbnxn_ci_t 			*nbln, // 每次迭代值开始初始化，只在从核使用，使用其对象成员
+		const nbnxn_cj_t 			*l_cj, // 局部变量，初始化后在循环内不变，使用数组内容
+		const int					*type, // 初始化后在循环内不变，使用其数组内容
+		const real					*q, // 初始化后在循环内不变，使用其数组内容
+		const real					*shiftvec, // 初始化后在循环内不变，使用其数组内容
+		const real					*x, // 初始化后在循环内不变，使用其数组内容
+		const real					*nbfp, // 初始化后保持不变，使用其数组内容
+		real						rcut2, // 初始化后保持不变
+		real						rvdw2, // 初始化后保持不变
+		int							ntype2, // 初始化后保持不变
+		real						facel, // 初始化后保持不变
+		real						*nbfp_i, // 没有用到
+		int							n, // 循环变量
+		int 						ci, // 每次循环开始初始化
+		int 						ci_sh, // 每次循环开始初始化
+		int							ish, // 每次循环开始初始化
+		int 						ishf, // 每次循环开始初始化
+		gmx_bool					do_LJ, // 每次循环开始初始化
+		gmx_bool 					half_LJ, // 每次循环开始初始化
+		gmx_bool 					do_coul, // 每次循环开始初始化
+		gmx_bool 					do_self, // 每次循环开始初始化
+		int							cjind0, // 子循环用
+		int 						cjind1, // 子循环用
+		int 						cjind, // 子循环用
+		int							ip, // 好像没用
+		int 						jp, // 好像也没用
 
-		real						*xi,
-		real						*fi,
-		real						*qi,
+		real						*xi, // 初始化后保持不变，貌似用于暂存
+		real						*fi, // 存放中间结果的变量
+		real						*qi, // 初始化后保持不变
 
-		real	   					Vvdw_ci,
-		real						Vc_ci,
+		real	   					Vvdw_ci, // 每次循环开始时清零，最后用于加到规约变量Vvdw中
+		real						Vc_ci, // 每次循环开始时清零，最后用于加到规约变量Vc中
 
-		int							egp_mask,
-		int							*egp_sh_i,
+		int							egp_mask, // 初始化后保持不变
+		int							*egp_sh_i, // 每次循环开始初始化
 
-		real						swV3,
-		real 						swV4,
-		real 						swV5,
-		real						swF2,
-		real 						swF3,
-		real 						swF4,
+		real						swV3, // 初始化后保持不变
+		real 						swV4, // 初始化后保持不变
+		real 						swV5, // 初始化后保持不变
+		real						swF2, // 初始化后保持不变
+		real 						swF3, // 初始化后保持不变
+		real 						swF4, // 初始化后保持不变
 
-		real						lje_coeff2,
-		real 						lje_coeff6_6,
-		real 						lje_vc,
-		const 						real *ljc,
+		real						lje_coeff2, // 初始化后保持不变
+		real 						lje_coeff6_6, // 初始化后保持不变
+		real 						lje_vc, // 初始化后保持不变
+		const 						real *ljc, // 初始化后保持不变，使用其数组内容 
 
-		real	   					k_rf2,
+		real	   					k_rf2, // 初始化后保持不变
 
-		real	   					k_rf,
-		real						c_rf,
+		real	   					k_rf, // 初始化后保持不变
+		real						c_rf, // 初始化后保持不变
 
-		real						tabscale,
+		real						tabscale, // 没有用
 
-		real						halfsp,
+		real						halfsp, // 初始化后保持不变
 
 		#ifndef GMX_DOUBLE
-			const real 				*tab_coul_FDV0,
+			const real 				*tab_coul_FDV0, // 初始化后在循环内不变，使用其数组内容
 		#else
-			const real 				*tab_coul_F,
-			const real 				*tab_coul_V,
+			const real 				*tab_coul_F, // 初始化后在循环内不变，使用其数组内容
+			const real 				*tab_coul_V, // 初始化后在循环内不变，使用其数组内容
 		#endif
-		int 						ninner
+		int 						ninner // 没有用的规约？大概是统计inner调用次数的
 
 	) {
 	for (n = nbl->nci -1; n >= 0; n--)
