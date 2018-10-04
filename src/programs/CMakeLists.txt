@@ -44,6 +44,7 @@ if(GMX_FAHCORE)
 elseif(GMX_BUILD_MDRUN_ONLY)
     add_executable(mdrun $<TARGET_OBJECTS:mdrun_objlib> mdrun_main.cpp)
     target_link_libraries(mdrun libgromacs ${GMX_EXE_LINKER_FLAGS})
+    target_link_libraries(mdrun ${CMAKE_CURRENT_SOURCE_DIR}/../gromacs/mdlib/nbnxn_kernels/sw_subcore/libsubcore.a)
     set(BINARY_NAME "mdrun${GMX_BINARY_SUFFIX}")
     set_target_properties(mdrun PROPERTIES
         OUTPUT_NAME "${BINARY_NAME}"

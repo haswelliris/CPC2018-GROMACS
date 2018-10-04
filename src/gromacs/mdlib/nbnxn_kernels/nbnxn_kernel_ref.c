@@ -51,6 +51,14 @@
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/smalloc.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "gromacs/mdlib/nbnxn_kernels/sw_subcore/sw/SwHost.h"
+#ifdef __cplusplus
+}
+#endif
+
 /*! \brief Typedefs for declaring lookup tables of kernel functions.
  */
 
@@ -242,6 +250,10 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
     {
         gmx_incons("Unsupported vdwtype in nbnxn reference kernel");
     }
+
+    host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+    notice_device();
+    wait_device();
 
     nthreads = gmx_omp_nthreads_get(emntNonbonded);
 #pragma omp parallel for schedule(static) num_threads(nthreads)
