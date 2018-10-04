@@ -240,10 +240,44 @@ void subcore_func(
 		}
 
 		cjind = cjind0;
-		while (cjind < cjind1 && nbl->cj[cjind].excl != 0xffff)
+
+		#define CHECK_EXCLS
+		if (half_LJ)
 		{
-			#define CHECK_EXCLS
-			if (half_LJ)
+			while (cjind < cjind1 && nbl->cj[cjind].excl != 0xffff)
+			{
+				#define CALC_COULOMB
+				#define HALF_LJ
+				#include "nbnxn_kernel_ref_inner.h"
+				#undef HALF_LJ
+				#undef CALC_COULOMB
+				cjind++;
+			}
+		}
+		else if (do_coul)
+		{
+			while (cjind < cjind1 && nbl->cj[cjind].excl != 0xffff)
+			{
+				#define CALC_COULOMB
+				#include "nbnxn_kernel_ref_inner.h"
+				#undef CALC_COULOMB
+				cjind++;
+			}
+			
+		}
+		else
+		{
+			while (cjind < cjind1 && nbl->cj[cjind].excl != 0xffff)
+			{
+				#include "nbnxn_kernel_ref_inner.h"
+				cjind++;
+			}
+		}
+		#undef CHECK_EXCLS
+
+		if (half_LJ)
+		{
+			for (; (cjind < cjind1); cjind++)
 			{
 				#define CALC_COULOMB
 				#define HALF_LJ
@@ -251,41 +285,25 @@ void subcore_func(
 				#undef HALF_LJ
 				#undef CALC_COULOMB
 			}
-			else if (do_coul)
+		}
+		else if (do_coul)
+		{
+			for (; (cjind < cjind1); cjind++)
 			{
 				#define CALC_COULOMB
 				#include "nbnxn_kernel_ref_inner.h"
 				#undef CALC_COULOMB
 			}
-			else
+
+		}
+		else
+		{
+			for (; (cjind < cjind1); cjind++)
 			{
 				#include "nbnxn_kernel_ref_inner.h"
 			}
-			#undef CHECK_EXCLS
-			cjind++;
 		}
 
-		for (; (cjind < cjind1); cjind++)
-		{
-			if (half_LJ)
-			{
-				#define CALC_COULOMB
-				#define HALF_LJ
-				#include "nbnxn_kernel_ref_inner.h"
-				#undef HALF_LJ
-				#undef CALC_COULOMB
-			}
-			else if (do_coul)
-			{
-				#define CALC_COULOMB
-				#include "nbnxn_kernel_ref_inner.h"
-				#undef CALC_COULOMB
-			}
-			else
-			{
-				#include "nbnxn_kernel_ref_inner.h"
-			}
-		}
 		// ninner += cjind1 - cjind0;
 
 		/* Add accumulated i-forces to the force array */
