@@ -104,13 +104,7 @@
             int interact;
 
             interact = ((l_cj.excl>>(i*UNROLLI + j)) & 1);
-            // #ifndef EXCL_FORCES
-            if (!macro_has(para_EXCL_FORCES))
-                skipmask = interact;
-            // #else
-            else
-                skipmask = !(cj == ci_sh && j <= i);
-            // #endif
+            skipmask = interact;
 #else
 #define interact 1.0
             skipmask = 1.0;
