@@ -1,3 +1,4 @@
+#include "nbnxn_kernel_ref_outer_fun.h"
 #include "SwHost.h"
 
 #include <stdlib.h>

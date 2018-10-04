@@ -177,9 +177,9 @@ void subcore_func()
 
 	// end init
 
-	for (n = 0; n < nbl->nci; n++)
-	// int task_num = BLOCK_SIZE(device_core_id, 64, nbl->nci);
-	// for (n = BLOCK_HEAD(device_core_id, 64, nbl->nci); task_num; task_num--)
+	// for (n = 0; n < nbl->nci; n++)
+	int task_num = BLOCK_SIZE(device_core_id, 64, nbl->nci);
+	for (n = BLOCK_HEAD(device_core_id, 64, nbl->nci); task_num; task_num--, n++)
 	{
 		int i, d;
 

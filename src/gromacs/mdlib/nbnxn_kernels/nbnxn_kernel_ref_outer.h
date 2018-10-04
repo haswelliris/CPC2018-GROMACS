@@ -158,9 +158,8 @@ NBK_FUNC_NAME(_VgrpF)
 
     // fake subcore
     int device_core_id;
-    // for (device_core_id = 0; device_core_id < 64; device_core_id++)
-    //     subcore_func(&workLoadPara, device_core_id);
-    subcore_func(&workLoadPara, device_core_id);
+    for (device_core_id = 0; device_core_id < 64; device_core_id++)
+        subcore_func(&workLoadPara, device_core_id);
 
     // real subcore
     // host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara;

@@ -1,6 +1,7 @@
 #ifndef __SW_DEVICE_H__
 #define __SW_DEVICE_H__
 
+#include "nbnxn_kernel_ref_outer_fun.h"
 #include "SwConfig.h"
 
 #include "slave.h"

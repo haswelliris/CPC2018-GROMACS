@@ -1,8 +1,11 @@
+#ifndef __SW_OUTER_FUNC_H__
+#define __SW_OUTER_FUNC_H__
+
 #include <stdio.h>
 #include <math.h>
 
 // custom define
-// #define GMX_DOUBLE
+#define GMX_DOUBLE
 
 #ifdef GMX_DOUBLE
 	typedef double real;
@@ -399,3 +402,4 @@ typedef struct {
 
 // -----------------------------------------------------------------------------
 
+#endif
