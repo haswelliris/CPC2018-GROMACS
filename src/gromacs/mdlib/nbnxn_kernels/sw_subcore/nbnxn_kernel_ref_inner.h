@@ -62,7 +62,7 @@ else {
 
 
     if (macro_has(para_ENERGY_GROUPS))
-        egp_cj = nbat->energrp[cj];
+        egp_cj = nbat.energrp[cj];
 
     for (i = 0; i < UNROLLI; i++)
     {
@@ -175,27 +175,27 @@ else {
                     frLJ    = FrLJ12 - FrLJ6;
                     /* 7 flops for r^-2 + LJ force */
                     if (macro_has(para_CALC_ENERGIES) || macro_has(para_LJ_POT_SWITCH)) {
-                        VLJ     = (FrLJ12 + c12*ic->repulsion_shift.cpot)/12 -
-                            (FrLJ6 + c6*ic->dispersion_shift.cpot)/6;
+                        VLJ     = (FrLJ12 + c12*ic.repulsion_shift.cpot)/12 -
+                            (FrLJ6 + c6*ic.dispersion_shift.cpot)/6;
                     }
                     /* 7 flops for LJ energy */
                 }
 
-                /* Force or potential switching from ic->rvdw_switch */
+                /* Force or potential switching from ic.rvdw_switch */
                 if (macro_has(para_LJ_FORCE_SWITCH) || macro_has(para_LJ_POT_SWITCH)) {
                     r       = rsq*rinv;
-                    rsw     = r - ic->rvdw_switch;
+                    rsw     = r - ic.rvdw_switch;
                     rsw     = (rsw >= 0.0 ? rsw : 0.0);
                 }
 
                 if (macro_has(para_LJ_FORCE_SWITCH)) {
                     frLJ   +=
-                        -c6*(ic->dispersion_shift.c2 + ic->dispersion_shift.c3*rsw)*rsw*rsw*r
-                        + c12*(ic->repulsion_shift.c2 + ic->repulsion_shift.c3*rsw)*rsw*rsw*r;
+                        -c6*(ic.dispersion_shift.c2 + ic.dispersion_shift.c3*rsw)*rsw*rsw*r
+                        + c12*(ic.repulsion_shift.c2 + ic.repulsion_shift.c3*rsw)*rsw*rsw*r;
                     if (macro_has(para_CALC_ENERGIES)) {
                         VLJ    +=
-                            -c6*(-ic->dispersion_shift.c2/3 - ic->dispersion_shift.c3/4*rsw)*rsw*rsw*rsw
-                            + c12*(-ic->repulsion_shift.c2/3 - ic->repulsion_shift.c3/4*rsw)*rsw*rsw*rsw;
+                            -c6*(-ic.dispersion_shift.c2/3 - ic.dispersion_shift.c3/4*rsw)*rsw*rsw*rsw
+                            + c12*(-ic.repulsion_shift.c2/3 - ic.repulsion_shift.c3/4*rsw)*rsw*rsw*rsw;
                     }
                 }
 
@@ -289,7 +289,7 @@ else {
 
                 if (macro_has(para_CALC_ENERGIES)) {
                     if (macro_has(para_ENERGY_GROUPS))
-                        Vvdw[egp_sh_i[i]+((egp_cj>>(nbat->neg_2log*j)) & egp_mask)] += VLJ;
+                        Vvdw[egp_sh_i[i]+((egp_cj>>(nbat.neg_2log*j)) & egp_mask)] += VLJ;
                     else
                         Vvdw_ci += VLJ;
                 /* 1 flop for LJ energy addition */
@@ -317,7 +317,7 @@ else {
             }
 
             if (macro_has(para_CALC_COUL_TAB)) {
-                rs     = rsq*rinv*ic->tabq_scale;
+                rs     = rsq*rinv*ic.tabq_scale;
                 ri     = (int)rs;
                 frac   = rs - ri;
                 #ifndef GMX_DOUBLE
@@ -332,12 +332,12 @@ else {
 
                 if (macro_has(para_CALC_ENERGIES)) {
                     #ifndef GMX_DOUBLE
-                    vcoul  = qq*(interact*(rinv - ic->sh_ewald)
+                    vcoul  = qq*(interact*(rinv - ic.sh_ewald)
                                  -(tab_coul_FDV0[ri*4+2]
                                    -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
                     /* 7 flops for float 1/r-table energy (8 with excls) */
                     #else
-                    vcoul  = qq*(interact*(rinv - ic->sh_ewald)
+                    vcoul  = qq*(interact*(rinv - ic.sh_ewald)
                                  -(tab_coul_V[ri]
                                    -halfsp*frac*(tab_coul_F[ri] + fexcl)));
                     #endif
@@ -348,7 +348,7 @@ else {
 
             if (macro_has(para_CALC_ENERGIES)) {
                 if (macro_has(para_ENERGY_GROUPS))
-                    Vc[egp_sh_i[i]+((egp_cj>>(nbat->neg_2log*j)) & egp_mask)] += vcoul;
+                    Vc[egp_sh_i[i]+((egp_cj>>(nbat.neg_2log*j)) & egp_mask)] += vcoul;
                 else
                     Vc_ci += vcoul;
                 /* 1 flop for Coulomb energy addition */
