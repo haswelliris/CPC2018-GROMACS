@@ -102,9 +102,7 @@ NBK_FUNC_NAME(_VgrpF)
     const real         *x;
     const real         *nbfp;
     real                rcut2;
-#ifdef VDW_CUTOFF_CHECK
-    real                rvdw2;
-#endif
+
     int                 ntype2;
     real                facel;
     real               *nbfp_i;
@@ -119,21 +117,7 @@ NBK_FUNC_NAME(_VgrpF)
     real                qi[UNROLLI];
 
 #ifdef CALC_ENERGIES
-#ifndef ENERGY_GROUPS
-
     real       Vvdw_ci, Vc_ci;
-#else
-    int        egp_mask;
-    int        egp_sh_i[UNROLLI];
-#endif
-#endif
-#ifdef LJ_POT_SWITCH
-    real       swV3, swV4, swV5;
-    real       swF2, swF3, swF4;
-#endif
-#ifdef LJ_EWALD
-    real        lje_coeff2, lje_coeff6_6, lje_vc;
-    const real *ljc;
 #endif
 
 #ifdef CALC_COUL_RF
@@ -156,68 +140,47 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
     // =========== DEF DATA =============
 
-    for (n = 0; n < device_func_para.nbl->nci; n++)
-    {
-        // =========== INIT DATA =============
-#ifdef LJ_POT_SWITCH
-        swV3 = device_func_para.ic->vdw_switch.c3;
-        swV4 = device_func_para.ic->vdw_switch.c4;
-        swV5 = device_func_para.ic->vdw_switch.c5;
-        swF2 = 3*device_func_para.ic->vdw_switch.c3;
-        swF3 = 4*device_func_para.ic->vdw_switch.c4;
-        swF4 = 5*device_func_para.ic->vdw_switch.c5;
-#endif
-
-#ifdef LJ_EWALD
-        lje_coeff2   = device_func_para.ic->ewaldcoeff_lj*device_func_para.ic->ewaldcoeff_lj;
-        lje_coeff6_6 = lje_coeff2*lje_coeff2*lje_coeff2/6.0;
-        lje_vc       = device_func_para.ic->sh_lj_ewald;
-
-        ljc          = device_func_para.nbat->nbfp_comb;
-#endif
-
+    // =========== INIT DATA =============
 #ifdef CALC_COUL_RF
-        k_rf2 = 2*device_func_para.ic->k_rf;
+    k_rf2 = 2*device_func_para.ic->k_rf;
 #ifdef CALC_ENERGIES
-        k_rf = device_func_para.ic->k_rf;
-        c_rf = device_func_para.ic->c_rf;
+    k_rf = device_func_para.ic->k_rf;
+    c_rf = device_func_para.ic->c_rf;
 #endif
 #endif
 #ifdef CALC_COUL_TAB
-        tabscale = device_func_para.ic->tabq_scale;
+    tabscale = device_func_para.ic->tabq_scale;
 #ifdef CALC_ENERGIES
-        halfsp = 0.5/device_func_para.ic->tabq_scale;
+    halfsp = 0.5/device_func_para.ic->tabq_scale;
 #endif
 
 #ifndef GMX_DOUBLE
-        tab_coul_FDV0 = device_func_para.ic->tabq_coul_FDV0;
+    tab_coul_FDV0 = device_func_para.ic->tabq_coul_FDV0;
 #else
-        tab_coul_F    = device_func_para.ic->tabq_coul_F;
-        tab_coul_V    = device_func_para.ic->tabq_coul_V;
+    tab_coul_F    = device_func_para.ic->tabq_coul_F;
+    tab_coul_V    = device_func_para.ic->tabq_coul_V;
 #endif
 #endif
 
-#ifdef ENERGY_GROUPS
-        egp_mask = (1<<device_func_para.nbat->neg_2log) - 1;
-#endif
 
+    rcut2               = device_func_para.ic->rcoulomb*device_func_para.ic->rcoulomb;
 
-        rcut2               = device_func_para.ic->rcoulomb*device_func_para.ic->rcoulomb;
-#ifdef VDW_CUTOFF_CHECK
-        rvdw2               = device_func_para.ic->rvdw*device_func_para.ic->rvdw;
-#endif
+    ntype2              = device_func_para.nbat->ntype*2;
+    nbfp                = device_func_para.nbat->nbfp;
+    q                   = device_func_para.nbat->q;
+    type                = device_func_para.nbat->type;
+    facel               = device_func_para.ic->epsfac;
+    func_para_shiftvec            = device_func_para.shift_vec[0];
+    x                   = device_func_para.nbat->x;
 
-        ntype2              = device_func_para.nbat->ntype*2;
-        nbfp                = device_func_para.nbat->nbfp;
-        q                   = device_func_para.nbat->q;
-        type                = device_func_para.nbat->type;
-        facel               = device_func_para.ic->epsfac;
-        func_para_shiftvec            = device_func_para.shift_vec[0];
-        x                   = device_func_para.nbat->x;
+    l_cj = device_func_para.nbl->cj;
+    // =========== INIT DATA =============
 
-        l_cj = device_func_para.nbl->cj;
-        // =========== INIT DATA =============
+    int start_nci = BLOCK_HEAD(device_core_id, 64, device_func_para.nbl->nci);
+    int end_nci = start_nci + BLOCK_SIZE(device_core_id, 64, device_func_para.nbl->nci);
 
+    for (n = 0; n < device_func_para.nbl->nci; n++)
+    {
         int i, d;
 
         nbln = &device_func_para.nbl->ci[n];
@@ -240,22 +203,12 @@ NBK_FUNC_NAME(_VgrpF)
         do_LJ   = (nbln->shift & NBNXN_CI_DO_LJ(0));
         do_coul = (nbln->shift & NBNXN_CI_DO_COUL(0));
         half_LJ = ((nbln->shift & NBNXN_CI_HALF_LJ(0)) || !do_LJ) && do_coul;
-#ifdef LJ_EWALD
-        do_self = TRUE;
-#else
+    
         do_self = do_coul;
-#endif
 
 #ifdef CALC_ENERGIES
-#ifndef ENERGY_GROUPS
         Vvdw_ci = 0;
         Vc_ci   = 0;
-#else
-        for (i = 0; i < UNROLLI; i++)
-        {
-            egp_sh_i[i] = ((device_func_para.nbat->energrp[ci]>>(i*device_func_para.nbat->neg_2log)) & egp_mask)*device_func_para.nbat->nenergrp;
-        }
-#endif
 #endif
 
         for (i = 0; i < UNROLLI; i++)
@@ -289,19 +242,8 @@ NBK_FUNC_NAME(_VgrpF)
             {
                 for (i = 0; i < UNROLLI; i++)
                 {
-                    int egp_ind;
-#ifdef ENERGY_GROUPS
-                    egp_ind = egp_sh_i[i] + ((device_func_para.nbat->energrp[ci]>>(i*device_func_para.nbat->neg_2log)) & egp_mask);
-#else
-                    egp_ind = 0;
-#endif
                     /* Coulomb self interaction */
-                    device_func_para.Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
-
-#ifdef LJ_EWALD
-                    /* LJ Ewald self interaction */
-                    device_func_para.Vvdw[egp_ind] += 0.5*device_func_para.nbat->nbfp[device_func_para.nbat->type[ci*UNROLLI+i]*(device_func_para.nbat->ntype + 1)*2]/6*lje_coeff6_6;
-#endif
+                    device_func_para.Vc[0]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
                 }
             }
         }
@@ -378,10 +320,8 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
 
 #ifdef CALC_ENERGIES
-#ifndef ENERGY_GROUPS
         *device_func_para.Vvdw += Vvdw_ci;
         *device_func_para.Vc   += Vc_ci;
-#endif
 #endif
     }
 }
