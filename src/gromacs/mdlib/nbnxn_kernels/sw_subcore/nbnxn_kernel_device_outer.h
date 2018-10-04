@@ -36,7 +36,7 @@
 #define UNROLLI    NBNXN_CPU_CLUSTER_I_SIZE
 #define UNROLLJ    NBNXN_CPU_CLUSTER_I_SIZE
 
-/* We could use para_nbat->xstride and para_nbat->fstride, but macros might be faster */
+/* We could use device_func_para.nbat->xstride and device_func_para.nbat->fstride, but macros might be faster */
 #define X_STRIDE   3
 #define F_STRIDE   3
 /* Local i-atom buffer strides */
@@ -53,13 +53,13 @@
 #define CALC_SHIFTFORCES
 
 #ifdef CALC_COUL_RF
-#define NBK_FUNC_NAME2(ljt, feg) nbnxn_kernel ## _ElecRF ## ljt ## feg ## _ref
+#define NBK_FUNC_NAME2(ljt, feg) nbnxn_kernel ## _ElecRF ## ljt ## feg ## _device
 #endif
 #ifdef CALC_COUL_TAB
 #ifndef VDW_CUTOFF_CHECK
-#define NBK_FUNC_NAME2(ljt, feg) nbnxn_kernel ## _ElecQSTab ## ljt ## feg ## _ref
+#define NBK_FUNC_NAME2(ljt, feg) nbnxn_kernel ## _ElecQSTab ## ljt ## feg ## _device
 #else
-#define NBK_FUNC_NAME2(ljt, feg) nbnxn_kernel ## _ElecQSTabTwinCut ## ljt ## feg ## _ref
+#define NBK_FUNC_NAME2(ljt, feg) nbnxn_kernel ## _ElecQSTabTwinCut ## ljt ## feg ## _device
 #endif
 #endif
 
@@ -91,28 +91,14 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
 #undef NBK_FUNC_NAME
 #undef NBK_FUNC_NAME2
-(const nbnxn_pairlist_t     *para_nbl,
- const nbnxn_atomdata_t     *para_nbat,
- const interaction_const_t  *para_ic,
- rvec                       *para_shift_vec,
- real                       *para_f
-#ifdef CALC_SHIFTFORCES
- ,
- real                       *para_fshift
-#endif
-#ifdef CALC_ENERGIES
- ,
- real                       *para_Vvdw,
- real                       *para_Vc
-#endif
-)
+()
 {
     // =========== DEF DATA =============
     const nbnxn_ci_t   *nbln;
     const nbnxn_cj_t   *l_cj;
     const int          *type;
     const real         *q;
-    const real         *para_shiftvec;
+    const real         *func_para_shiftvec;
     const real         *x;
     const real         *nbfp;
     real                rcut2;
@@ -170,74 +156,74 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
     // =========== DEF DATA =============
 
-    for (n = 0; n < para_nbl->nci; n++)
+    for (n = 0; n < device_func_para.nbl->nci; n++)
     {
         // =========== INIT DATA =============
 #ifdef LJ_POT_SWITCH
-        swV3 = para_ic->vdw_switch.c3;
-        swV4 = para_ic->vdw_switch.c4;
-        swV5 = para_ic->vdw_switch.c5;
-        swF2 = 3*para_ic->vdw_switch.c3;
-        swF3 = 4*para_ic->vdw_switch.c4;
-        swF4 = 5*para_ic->vdw_switch.c5;
+        swV3 = device_func_para.ic->vdw_switch.c3;
+        swV4 = device_func_para.ic->vdw_switch.c4;
+        swV5 = device_func_para.ic->vdw_switch.c5;
+        swF2 = 3*device_func_para.ic->vdw_switch.c3;
+        swF3 = 4*device_func_para.ic->vdw_switch.c4;
+        swF4 = 5*device_func_para.ic->vdw_switch.c5;
 #endif
 
 #ifdef LJ_EWALD
-        lje_coeff2   = para_ic->ewaldcoeff_lj*para_ic->ewaldcoeff_lj;
+        lje_coeff2   = device_func_para.ic->ewaldcoeff_lj*device_func_para.ic->ewaldcoeff_lj;
         lje_coeff6_6 = lje_coeff2*lje_coeff2*lje_coeff2/6.0;
-        lje_vc       = para_ic->sh_lj_ewald;
+        lje_vc       = device_func_para.ic->sh_lj_ewald;
 
-        ljc          = para_nbat->nbfp_comb;
+        ljc          = device_func_para.nbat->nbfp_comb;
 #endif
 
 #ifdef CALC_COUL_RF
-        k_rf2 = 2*para_ic->k_rf;
+        k_rf2 = 2*device_func_para.ic->k_rf;
 #ifdef CALC_ENERGIES
-        k_rf = para_ic->k_rf;
-        c_rf = para_ic->c_rf;
+        k_rf = device_func_para.ic->k_rf;
+        c_rf = device_func_para.ic->c_rf;
 #endif
 #endif
 #ifdef CALC_COUL_TAB
-        tabscale = para_ic->tabq_scale;
+        tabscale = device_func_para.ic->tabq_scale;
 #ifdef CALC_ENERGIES
-        halfsp = 0.5/para_ic->tabq_scale;
+        halfsp = 0.5/device_func_para.ic->tabq_scale;
 #endif
 
 #ifndef GMX_DOUBLE
-        tab_coul_FDV0 = para_ic->tabq_coul_FDV0;
+        tab_coul_FDV0 = device_func_para.ic->tabq_coul_FDV0;
 #else
-        tab_coul_F    = para_ic->tabq_coul_F;
-        tab_coul_V    = para_ic->tabq_coul_V;
+        tab_coul_F    = device_func_para.ic->tabq_coul_F;
+        tab_coul_V    = device_func_para.ic->tabq_coul_V;
 #endif
 #endif
 
 #ifdef ENERGY_GROUPS
-        egp_mask = (1<<para_nbat->neg_2log) - 1;
+        egp_mask = (1<<device_func_para.nbat->neg_2log) - 1;
 #endif
 
 
-        rcut2               = para_ic->rcoulomb*para_ic->rcoulomb;
+        rcut2               = device_func_para.ic->rcoulomb*device_func_para.ic->rcoulomb;
 #ifdef VDW_CUTOFF_CHECK
-        rvdw2               = para_ic->rvdw*para_ic->rvdw;
+        rvdw2               = device_func_para.ic->rvdw*device_func_para.ic->rvdw;
 #endif
 
-        ntype2              = para_nbat->ntype*2;
-        nbfp                = para_nbat->nbfp;
-        q                   = para_nbat->q;
-        type                = para_nbat->type;
-        facel               = para_ic->epsfac;
-        para_shiftvec            = para_shift_vec[0];
-        x                   = para_nbat->x;
+        ntype2              = device_func_para.nbat->ntype*2;
+        nbfp                = device_func_para.nbat->nbfp;
+        q                   = device_func_para.nbat->q;
+        type                = device_func_para.nbat->type;
+        facel               = device_func_para.ic->epsfac;
+        func_para_shiftvec            = device_func_para.shift_vec[0];
+        x                   = device_func_para.nbat->x;
 
-        l_cj = para_nbl->cj;
+        l_cj = device_func_para.nbl->cj;
         // =========== INIT DATA =============
 
         int i, d;
 
-        nbln = &para_nbl->ci[n];
+        nbln = &device_func_para.nbl->ci[n];
 
         ish              = (nbln->shift & NBNXN_CI_SHIFT);
-        /* x, para_f and para_fshift are assumed to be stored with stride 3 */
+        /* x, device_func_para.f and device_func_para.fshift are assumed to be stored with stride 3 */
         ishf             = ish*DIM;
         cjind0           = nbln->cj_ind_start;
         cjind1           = nbln->cj_ind_end;
@@ -267,7 +253,7 @@ NBK_FUNC_NAME(_VgrpF)
 #else
         for (i = 0; i < UNROLLI; i++)
         {
-            egp_sh_i[i] = ((para_nbat->energrp[ci]>>(i*para_nbat->neg_2log)) & egp_mask)*para_nbat->nenergrp;
+            egp_sh_i[i] = ((device_func_para.nbat->energrp[ci]>>(i*device_func_para.nbat->neg_2log)) & egp_mask)*device_func_para.nbat->nenergrp;
         }
 #endif
 #endif
@@ -276,7 +262,7 @@ NBK_FUNC_NAME(_VgrpF)
         {
             for (d = 0; d < DIM; d++)
             {
-                xi[i*XI_STRIDE+d] = x[(ci*UNROLLI+i)*X_STRIDE+d] + para_shiftvec[ishf+d];
+                xi[i*XI_STRIDE+d] = x[(ci*UNROLLI+i)*X_STRIDE+d] + func_para_shiftvec[ishf+d];
                 fi[i*FI_STRIDE+d] = 0;
             }
 
@@ -305,16 +291,16 @@ NBK_FUNC_NAME(_VgrpF)
                 {
                     int egp_ind;
 #ifdef ENERGY_GROUPS
-                    egp_ind = egp_sh_i[i] + ((para_nbat->energrp[ci]>>(i*para_nbat->neg_2log)) & egp_mask);
+                    egp_ind = egp_sh_i[i] + ((device_func_para.nbat->energrp[ci]>>(i*device_func_para.nbat->neg_2log)) & egp_mask);
 #else
                     egp_ind = 0;
 #endif
                     /* Coulomb self interaction */
-                    para_Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+                    device_func_para.Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
 
 #ifdef LJ_EWALD
                     /* LJ Ewald self interaction */
-                    para_Vvdw[egp_ind] += 0.5*para_nbat->nbfp[para_nbat->type[ci*UNROLLI+i]*(para_nbat->ntype + 1)*2]/6*lje_coeff6_6;
+                    device_func_para.Vvdw[egp_ind] += 0.5*device_func_para.nbat->nbfp[device_func_para.nbat->type[ci*UNROLLI+i]*(device_func_para.nbat->ntype + 1)*2]/6*lje_coeff6_6;
 #endif
                 }
             }
@@ -322,26 +308,26 @@ NBK_FUNC_NAME(_VgrpF)
 #endif  /* CALC_ENERGIES */
 
         cjind = cjind0;
-        while (cjind < cjind1 && para_nbl->cj[cjind].excl != 0xffff)
+        while (cjind < cjind1 && device_func_para.nbl->cj[cjind].excl != 0xffff)
         {
 #define CHECK_EXCLS
             if (half_LJ)
             {
 #define CALC_COULOMB
 #define HALF_LJ
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_device_inner.h"
 #undef HALF_LJ
 #undef CALC_COULOMB
             }
             else if (do_coul)
             {
 #define CALC_COULOMB
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_device_inner.h"
 #undef CALC_COULOMB
             }
             else
             {
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_device_inner.h"
             }
 #undef CHECK_EXCLS
             cjind++;
@@ -353,19 +339,19 @@ NBK_FUNC_NAME(_VgrpF)
             {
 #define CALC_COULOMB
 #define HALF_LJ
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_device_inner.h"
 #undef HALF_LJ
 #undef CALC_COULOMB
             }
             else if (do_coul)
             {
 #define CALC_COULOMB
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_device_inner.h"
 #undef CALC_COULOMB
             }
             else
             {
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_device_inner.h"
             }
         }
 
@@ -374,18 +360,18 @@ NBK_FUNC_NAME(_VgrpF)
         {
             for (d = 0; d < DIM; d++)
             {
-                para_f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
+                device_func_para.f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
             }
         }
 #ifdef CALC_SHIFTFORCES
-        if (para_fshift != NULL)
+        if (device_func_para.fshift != NULL)
         {
             /* Add i forces to shifted force list */
             for (i = 0; i < UNROLLI; i++)
             {
                 for (d = 0; d < DIM; d++)
                 {
-                    para_fshift[ishf+d] += fi[i*FI_STRIDE+d];
+                    device_func_para.fshift[ishf+d] += fi[i*FI_STRIDE+d];
                 }
             }
         }
@@ -393,8 +379,8 @@ NBK_FUNC_NAME(_VgrpF)
 
 #ifdef CALC_ENERGIES
 #ifndef ENERGY_GROUPS
-        *para_Vvdw += Vvdw_ci;
-        *para_Vc   += Vc_ci;
+        *device_func_para.Vvdw += Vvdw_ci;
+        *device_func_para.Vc   += Vc_ci;
 #endif
 #endif
     }

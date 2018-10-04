@@ -50,7 +50,7 @@
     cj = l_cj[cjind].cj;
 
 #ifdef ENERGY_GROUPS
-    egp_cj = para_nbat->energrp[cj];
+    egp_cj = device_func_para.nbat->energrp[cj];
 #endif
     for (i = 0; i < UNROLLI; i++)
     {
@@ -157,26 +157,26 @@
                 frLJ    = FrLJ12 - FrLJ6;
                 /* 7 flops for r^-2 + LJ force */
 #if defined CALC_ENERGIES || defined LJ_POT_SWITCH
-                VLJ     = (FrLJ12 + c12*para_ic->repulsion_shift.cpot)/12 -
-                    (FrLJ6 + c6*para_ic->dispersion_shift.cpot)/6;
+                VLJ     = (FrLJ12 + c12*device_func_para.ic->repulsion_shift.cpot)/12 -
+                    (FrLJ6 + c6*device_func_para.ic->dispersion_shift.cpot)/6;
                 /* 7 flops for LJ energy */
 #endif
 #endif
 
 #if defined LJ_FORCE_SWITCH || defined LJ_POT_SWITCH
-                /* Force or potential switching from para_ic->rvdw_switch */
+                /* Force or potential switching from device_func_para.ic->rvdw_switch */
                 r       = rsq*rinv;
-                rsw     = r - para_ic->rvdw_switch;
+                rsw     = r - device_func_para.ic->rvdw_switch;
                 rsw     = (rsw >= 0.0 ? rsw : 0.0);
 #endif
 #ifdef LJ_FORCE_SWITCH
                 frLJ   +=
-                    -c6*(para_ic->dispersion_shift.c2 + para_ic->dispersion_shift.c3*rsw)*rsw*rsw*r
-                    + c12*(para_ic->repulsion_shift.c2 + para_ic->repulsion_shift.c3*rsw)*rsw*rsw*r;
+                    -c6*(device_func_para.ic->dispersion_shift.c2 + device_func_para.ic->dispersion_shift.c3*rsw)*rsw*rsw*r
+                    + c12*(device_func_para.ic->repulsion_shift.c2 + device_func_para.ic->repulsion_shift.c3*rsw)*rsw*rsw*r;
 #if defined CALC_ENERGIES
                 VLJ    +=
-                    -c6*(-para_ic->dispersion_shift.c2/3 - para_ic->dispersion_shift.c3/4*rsw)*rsw*rsw*rsw
-                    + c12*(-para_ic->repulsion_shift.c2/3 - para_ic->repulsion_shift.c3/4*rsw)*rsw*rsw*rsw;
+                    -c6*(-device_func_para.ic->dispersion_shift.c2/3 - device_func_para.ic->dispersion_shift.c3/4*rsw)*rsw*rsw*rsw
+                    + c12*(-device_func_para.ic->repulsion_shift.c2/3 - device_func_para.ic->repulsion_shift.c3/4*rsw)*rsw*rsw*rsw;
 #endif
 #endif
 
@@ -268,7 +268,7 @@
 
 #ifdef CALC_ENERGIES
 #ifdef ENERGY_GROUPS
-                para_Vvdw[egp_sh_i[i]+((egp_cj>>(para_nbat->neg_2log*j)) & egp_mask)] += VLJ;
+                device_func_para.Vvdw[egp_sh_i[i]+((egp_cj>>(device_func_para.nbat->neg_2log*j)) & egp_mask)] += VLJ;
 #else
                 Vvdw_ci += VLJ;
                 /* 1 flop for LJ energy addition */
@@ -298,7 +298,7 @@
 #endif
 
 #ifdef CALC_COUL_TAB
-            rs     = rsq*rinv*para_ic->tabq_scale;
+            rs     = rsq*rinv*device_func_para.ic->tabq_scale;
             ri     = (int)rs;
             frac   = rs - ri;
 #ifndef GMX_DOUBLE
@@ -312,12 +312,12 @@
             /* 7 flops for float 1/r-table force */
 #ifdef CALC_ENERGIES
 #ifndef GMX_DOUBLE
-            vcoul  = qq*(interact*(rinv - para_ic->sh_ewald)
+            vcoul  = qq*(interact*(rinv - device_func_para.ic->sh_ewald)
                          -(tab_coul_FDV0[ri*4+2]
                            -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
             /* 7 flops for float 1/r-table energy (8 with excls) */
 #else
-            vcoul  = qq*(interact*(rinv - para_ic->sh_ewald)
+            vcoul  = qq*(interact*(rinv - device_func_para.ic->sh_ewald)
                          -(tab_coul_V[ri]
                            -halfsp*frac*(tab_coul_F[ri] + fexcl)));
 #endif
@@ -327,7 +327,7 @@
 
 #ifdef CALC_ENERGIES
 #ifdef ENERGY_GROUPS
-            para_Vc[egp_sh_i[i]+((egp_cj>>(para_nbat->neg_2log*j)) & egp_mask)] += vcoul;
+            device_func_para.Vc[egp_sh_i[i]+((egp_cj>>(device_func_para.nbat->neg_2log*j)) & egp_mask)] += vcoul;
 #else
             Vc_ci += vcoul;
             /* 1 flop for Coulomb energy addition */
@@ -361,9 +361,9 @@
             fi[i*FI_STRIDE+YY] += fy;
             fi[i*FI_STRIDE+ZZ] += fz;
             /* Decrement j-atom force */
-            para_f[aj*F_STRIDE+XX]  -= fx;
-            para_f[aj*F_STRIDE+YY]  -= fy;
-            para_f[aj*F_STRIDE+ZZ]  -= fz;
+            device_func_para.f[aj*F_STRIDE+XX]  -= fx;
+            device_func_para.f[aj*F_STRIDE+YY]  -= fy;
+            device_func_para.f[aj*F_STRIDE+ZZ]  -= fz;
             /* 9 flops for force addition */
         }
     }

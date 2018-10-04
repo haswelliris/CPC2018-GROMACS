@@ -10,18 +10,18 @@
 #include <stdlib.h>
 
 
-#define TLOG(M, ...)  {if(device_rank == 0 && device_core_id == 0) { \
-	                  fprintf(stderr, "[%s  %s] [DEV TLOG ] (%d): " M "", __DATE__, __TIME__, __LINE__, ##__VA_ARGS__); }}
+#define TLOG(M, ...)  {if(device_param.host_rank == 0 && device_core_id == 0) { \
+	                  fprintf(stderr, "[DEV  TLOG ] (%d): " M "", __LINE__, ##__VA_ARGS__); }}
 
 #define OLOG(M, ...)  {if(device_core_id == 0) { \
-	                  fprintf(stderr, "[%s  %s] [DEV OLOG ] (RANK%d  %d): " M "", __DATE__, __TIME__, device_rank, __LINE__, ##__VA_ARGS__); }}
+	                  fprintf(stderr, "[DEV  OLOG ] (RANK%d  %d): " M "", device_param.host_rank, __LINE__, ##__VA_ARGS__); }}
 
 #ifndef __thread_local
 #define __thread_local const
 #endif
 
 extern __thread_local struct InitParam device_param;
-extern __thread_local int device_core_id, device_core_x, device_core_y, device_rank;
+extern __thread_local int device_core_id, device_core_x, device_core_y;
 extern __thread_local long device_notice_counter;     
 extern __thread_local volatile long device_in_param[PARAM_SIZE]; 
 extern __thread_local volatile long device_out_param[PARAM_SIZE];   

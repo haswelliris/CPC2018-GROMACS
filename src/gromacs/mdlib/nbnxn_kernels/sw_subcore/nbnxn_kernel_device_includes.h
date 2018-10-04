@@ -39,11 +39,11 @@
  */
 
 /* Include the force only kernels */
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_outer.h"
+#include "nbnxn_kernel_device_outer.h"
 
 /* Include the force+energy kernels */
 #define CALC_ENERGIES
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_outer.h"
+#include "nbnxn_kernel_device_outer.h"
 #undef CALC_ENERGIES
 
 /* Include the force+energygroups kernels */
@@ -51,7 +51,7 @@
 
 #define CALC_ENERGIES
 #define ENERGY_GROUPS
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_outer.h"
+#include "nbnxn_kernel_device_outer.h"
 #undef ENERGY_GROUPS
 #undef CALC_ENERGIES
 

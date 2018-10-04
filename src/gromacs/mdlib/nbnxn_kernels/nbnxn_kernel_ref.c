@@ -170,12 +170,35 @@ p_nbk_func_ener p_nbk_c_ener[coultNR][vdwtNR] =
     { nbnxn_kernel_ElecQSTabTwinCut_VdwLJ_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJFsw_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJPsw_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombGeom_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombLB_VF_ref  }
 };
 
+#ifdef SW_ENERGRP /* in SwConfig */
+
 p_nbk_func_ener p_nbk_c_energrp[coultNR][vdwtNR] =
 {
     { nbnxn_kernel_ElecRF_VdwLJ_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJFsw_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJPsw_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombGeom_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombLB_VgrpF_ref           },
     { nbnxn_kernel_ElecQSTab_VdwLJ_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJFsw_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJPsw_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombGeom_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombLB_VgrpF_ref        },
     { nbnxn_kernel_ElecQSTabTwinCut_VdwLJ_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJFsw_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJPsw_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombGeom_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombLB_VgrpF_ref }
 };
+
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct {
+    nbnxn_pairlist_t     *nbl;
+    nbnxn_atomdata_t     *nbat;
+    interaction_const_t  *ic;
+    rvec                       *shift_vec;
+    real                       *f;
+    real                       *fshift;
+    real                       *Vvdw;
+    real                       *Vc;
+} func_para_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 void
 nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
@@ -194,6 +217,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
     int                vdwt;
     int                nb;
     int                nthreads gmx_unused;
+
+    func_para_t host_func_para;
 
     nnbl = nbl_list->nnbl;
     nbl  = nbl_list->nbl;
@@ -251,10 +276,6 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         gmx_incons("Unsupported vdwtype in nbnxn reference kernel");
     }
 
-    host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
-    notice_device();
-    wait_device();
-
     nthreads = gmx_omp_nthreads_get(emntNonbonded);
 #pragma omp parallel for schedule(static) num_threads(nthreads)
     for (nb = 0; nb < nnbl; nb++)
@@ -283,20 +304,66 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
         }
 
+
         if (!(force_flags & GMX_FORCE_ENERGY))
         {
+            host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+            host_out_param[FUNC_TYPE] = FUNC_NO_ENER;
+            host_out_param[FUNC_I] = coult;
+            host_out_param[FUNC_J] = vdwt;
+            host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
+            host_func_para.nbl = nbl[nb];
+            host_func_para.nbat = nbat;
+            host_func_para.ic = ic;
+            host_func_para.shift_vec = shift_vec;
+            host_func_para.f = out->f;
+            host_func_para.fshift = fshift_p;
+            host_func_para.Vvdw = NULL;
+            host_func_para.Vc = NULL;
+#ifdef SW_HOST_LOG /* in SwConfig */
+            if((host_param.host_rank + host_notice_counter) % 64 == 0)
+            {
+                OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_NO_ENER, coult, vdwt);
+            }
+#endif
+            notice_device();
+            wait_device();
+
             /* Don't calculate energies */
             p_nbk_c_noener[coult][vdwt](nbl[nb], nbat,
                                         ic,
                                         shift_vec,
                                         out->f,
                                         fshift_p);
+
         }
         else if (out->nV == 1)
         {
             /* No energy groups */
             out->Vvdw[0] = 0;
             out->Vc[0]   = 0;
+
+            host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+            host_out_param[FUNC_TYPE] = FUNC_ENER;
+            host_out_param[FUNC_I] = coult;
+            host_out_param[FUNC_J] = vdwt;
+            host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
+            host_func_para.nbl = nbl[nb];
+            host_func_para.nbat = nbat;
+            host_func_para.ic = ic;
+            host_func_para.shift_vec = shift_vec;
+            host_func_para.f = out->f;
+            host_func_para.fshift = fshift_p;
+            host_func_para.Vvdw = out->Vvdw;
+            host_func_para.Vc = out->Vc;
+#ifdef SW_HOST_LOG /* in SwConfig */
+            if((host_param.host_rank + host_notice_counter) % 64 == 0)
+            {
+                OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_ENER, coult, vdwt);
+            }
+#endif
+            notice_device();
+            wait_device();
 
             p_nbk_c_ener[coult][vdwt](nbl[nb], nbat,
                                       ic,
@@ -320,6 +387,28 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                 out->Vc[i] = 0;
             }
 
+            host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+            host_out_param[FUNC_TYPE] = FUNC_ENERGRP;
+            host_out_param[FUNC_I] = coult;
+            host_out_param[FUNC_J] = vdwt;
+            host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
+            host_func_para.nbl = nbl[nb];
+            host_func_para.nbat = nbat;
+            host_func_para.ic = ic;
+            host_func_para.shift_vec = shift_vec;
+            host_func_para.f = out->f;
+            host_func_para.fshift = fshift_p;
+            host_func_para.Vvdw = out->Vvdw;
+            host_func_para.Vc = out->Vc;
+#ifdef SW_HOST_LOG /* in SwConfig */
+            if((host_param.host_rank + host_notice_counter) % 64 == 0)
+            {
+                OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_ENERGRP, coult, vdwt);
+            }
+#endif
+            notice_device();
+            wait_device();
+#ifdef SW_ENERGRP /* in SwConfig */
             p_nbk_c_energrp[coult][vdwt](nbl[nb], nbat,
                                          ic,
                                          shift_vec,
@@ -327,6 +416,15 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                                          fshift_p,
                                          out->Vvdw,
                                          out->Vc);
+#else
+            static int grp_call=0;
+            if(grp_call == 0)
+            {
+                OLOG("No Energy Group Function.\n");
+                grp_call = 1;
+            }
+
+#endif
         }
     }
 

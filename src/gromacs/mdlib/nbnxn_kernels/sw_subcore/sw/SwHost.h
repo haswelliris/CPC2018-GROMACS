@@ -20,4 +20,10 @@ void wait_device();
 
 void release_device();
 
+#define OLOG(M, ...)  { \
+	                  fprintf(stderr, "[HOST OLOG ] (RANK%d  %d): " M "", host_param.host_rank, __LINE__, ##__VA_ARGS__); }
+
+#define TLOG(M, ...)  {if(host_param.host_rank == 0) { \
+	                  fprintf(stderr, "[HOST TLOG ] (%d): " M "", __LINE__, ##__VA_ARGS__); }}
+
 #endif
