@@ -3,10 +3,12 @@
 
 #ifdef HOST_RUN
 	#include <string.h>
-	#define get_mem(A, B, C) memcpy(A, B, C)
+	#define aget_mem(A, B, C) memcpy(A, B, C)
+	#define sget_mem(A, B, C) memcpy(A, B, C)
 #else
 	#include "SwDevice.h"
-	#define get_mem(A, B, C) async_get(A, B, C)
+	#define aget_mem(A, B, C) async_get(A, B, C)
+	#define sget_mem(A, B, C) sync_get(A, B, C)
 #endif
 
 
@@ -14,6 +16,8 @@
 
 int 						macro_para;
 nbnxn_pairlist_t			nbl; // 会用到这个结构体里少量值
+// nbl.nci = 2000
+// nbl.ncj = 40000
 nbnxn_atomdata_t			nbat; // 会用到这个结构体里比较多的东西
 interaction_const_t			ic; // 用于大量初始化，inner中也有很多使用
 rvec					 	*shift_vec; // 不需要传入，已提取到shiftvec
@@ -22,8 +26,8 @@ real					 	*fshift; // 会被更改的量，有规约！
 real					 	*Vvdw; // 会被更改的量，有规约！
 real					 	*Vc; // 会被更改的量，有规约！
 
-const nbnxn_ci_t 			*nbln; // 每次迭代值开始初始化，只在从核使用，使用其对象成员
-const nbnxn_cj_t 			*l_cj; // 局部变量，初始化后在循环内不变，使用数组内容
+nbnxn_ci_t 					nbln; // 每次迭代值开始初始化，只在从核使用，使用其对象成员
+nbnxn_cj_t 					l_cj; // 局部变量，初始化后在循环内不变，使用数组内容
 const int					*type; // 初始化后在循环内不变，使用其数组内容
 const real					*q; // 初始化后在循环内不变，使用其数组内容
 const real					*shiftvec; // 初始化后在循环内不变，使用其数组内容
@@ -96,12 +100,7 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass, int device_core_id)
 void subcore_func()
 #endif
 {
-
-	#ifdef HOST_RUN
-		memcpy(&workLoadPara, workLoadPara_pass, sizeof(struct WorkLoadPara));
-	#else
-		sync_get(&workLoadPara, workLoadPara_pass, sizeof(struct WorkLoadPara));
-	#endif
+	sget_mem(&workLoadPara, workLoadPara_pass, sizeof(struct WorkLoadPara));
 
 	macro_para = workLoadPara.macro_para;
 	// nbl = workLoadPara.nbl;
@@ -113,17 +112,23 @@ void subcore_func()
 	Vvdw = workLoadPara.Vvdw;
 	Vc = workLoadPara.Vc;
 
-	// load data
+	// load obj
 
-	get_mem(&nbl, workLoadPara.nbl, sizeof(nbnxn_pairlist_t));
-	get_mem(&nbat, workLoadPara.nbat, sizeof(nbnxn_atomdata_t));
-	get_mem(&ic, workLoadPara.ic, sizeof(interaction_const_t));
-
+	aget_mem(&nbl, workLoadPara.nbl, sizeof(nbnxn_pairlist_t));
+	aget_mem(&nbat, workLoadPara.nbat, sizeof(nbnxn_atomdata_t));
+	aget_mem(&ic, workLoadPara.ic, sizeof(interaction_const_t));
 
 	#ifndef HOST_RUN
 		wait_all_async_get();
 	#endif
 
+	// end load obj
+
+	// load sub obj
+
+	
+
+	// end load sub obj
 
 	// init
 
@@ -186,9 +191,11 @@ void subcore_func()
     shiftvec            = shift_vec[0];
     x                   = nbat.x;
 
-    l_cj = nbl.cj;
+    // l_cj = nbl.cj;
 
 	// end init
+
+    // printf("%d\n", nbl.ncj);
 
 	// for (n = 0; n < nbl.nci; n++)
 	int task_num = BLOCK_SIZE(device_core_id, 64, nbl.nci);
@@ -196,15 +203,22 @@ void subcore_func()
 	{
 		int i, d;
 
-		nbln = &nbl.ci[n];
+		// nbln = &nbl.ci[n];
+		sget_mem(&nbln, &nbl.ci[n], sizeof(nbnxn_ci_t));
 
-		ish			  = (nbln->shift & NBNXN_CI_SHIFT);
+		aget_mem(&nbl.cj[nbln.cj_ind_start], &l_cj, sizeof(nbnxn_cj_t));
+
+		#ifndef HOST_RUN
+			wait_all_async_get();
+		#endif
+
+		ish			  = (nbln.shift & NBNXN_CI_SHIFT);
 		/* x, f and fshift are assumed to be stored with stride 3 */
 		ishf			 = ish*DIM;
-		cjind0		   = nbln->cj_ind_start;
-		cjind1		   = nbln->cj_ind_end;
+		cjind0		   = nbln.cj_ind_start;
+		cjind1		   = nbln.cj_ind_end;
 		/* Currently only works super-cells equal to sub-cells */
-		ci			   = nbln->ci;
+		ci			   = nbln.ci;
 		ci_sh			= (ish == CENTRAL ? ci : -1);
 
 		/* We have 5 LJ/C combinations, but use only three inner loops,
@@ -213,9 +227,9 @@ void subcore_func()
 		 * inner LJ + C	  for full-LJ + C
 		 * inner LJ		  for full-LJ + no-C / half-LJ + no-C
 		 */
-		do_LJ   = (nbln->shift & NBNXN_CI_DO_LJ(0));
-		do_coul = (nbln->shift & NBNXN_CI_DO_COUL(0));
-		half_LJ = ((nbln->shift & NBNXN_CI_HALF_LJ(0)) || !do_LJ) && do_coul;
+		do_LJ   = (nbln.shift & NBNXN_CI_DO_LJ(0));
+		do_coul = (nbln.shift & NBNXN_CI_DO_COUL(0));
+		half_LJ = ((nbln.shift & NBNXN_CI_HALF_LJ(0)) || !do_LJ) && do_coul;
 
 		if (macro_has(para_LJ_EWALD))
 			do_self = TRUE;
@@ -264,7 +278,7 @@ void subcore_func()
 				}
 
 
-				if (l_cj[nbln->cj_ind_start].cj == ci_sh)
+				if (l_cj.cj == ci_sh)
 				{
 					for (i = 0; i < UNROLLI; i++)
 					{

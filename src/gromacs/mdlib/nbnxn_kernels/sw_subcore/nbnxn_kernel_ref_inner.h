@@ -58,7 +58,7 @@ else {
 // #endif
     int i;
 
-    cj = l_cj[cjind].cj;
+    cj = l_cj.cj;
 
 
     if (macro_has(para_ENERGY_GROUPS))
@@ -113,7 +113,7 @@ else {
              * (e.g. because of bonding). */
             int interact;
 
-            interact = ((l_cj[cjind].excl>>(i*UNROLLI + j)) & 1);
+            interact = ((l_cj.excl>>(i*UNROLLI + j)) & 1);
             // #ifndef EXCL_FORCES
             if (!macro_has(para_EXCL_FORCES))
                 skipmask = interact;
