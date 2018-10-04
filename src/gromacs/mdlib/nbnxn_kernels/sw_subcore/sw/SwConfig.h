@@ -39,9 +39,12 @@ struct InitParam
 #undef SW_HOST_LOG
 
 #define SW_DEVICE_LOG
+#undef SW_DEVICE_LOG
 
 #define SW_ENERGRP
 #undef SW_ENERGRP
+
+#define SW_TEST_FUNC
 // ----
 
 #endif
