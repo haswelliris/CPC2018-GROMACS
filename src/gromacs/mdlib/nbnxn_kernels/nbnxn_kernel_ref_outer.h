@@ -101,61 +101,6 @@ NBK_FUNC_NAME(_VgrpF)
  real                       *Vc
 )
 {
-    const nbnxn_ci_t   *nbln;
-    const nbnxn_cj_t   *l_cj;
-    const int          *type;
-    const real         *q;
-    const real         *shiftvec;
-    const real         *x;
-    const real         *nbfp;
-    real                rcut2;
-    real                rvdw2;
-    int                 ntype2;
-    real                facel;
-    real               *nbfp_i;
-    int                 n, ci, ci_sh;
-    int                 ish, ishf;
-    gmx_bool            do_LJ, half_LJ, do_coul, do_self;
-    int                 cjind0, cjind1, cjind;
-    int                 ip, jp;
-
-    real                xi[UNROLLI*XI_STRIDE];
-    real                fi[UNROLLI*FI_STRIDE];
-    real                qi[UNROLLI];
-
-    real       Vvdw_ci, Vc_ci;
-
-    int        egp_mask;
-    int        egp_sh_i[UNROLLI];
-
-    real       swV3, swV4, swV5;
-    real       swF2, swF3, swF4;
-
-    real        lje_coeff2, lje_coeff6_6, lje_vc;
-    const real *ljc;
-
-    real       k_rf2;
-
-    real       k_rf, c_rf;
-
-    real       tabscale;
-
-    real       halfsp;
-
-#ifndef GMX_DOUBLE
-    const real *tab_coul_FDV0;
-#else
-    const real *tab_coul_F;
-    const real *tab_coul_V;
-#endif
-
-    int ninner;
-
-#ifdef COUNT_PAIRS
-    int npair = 0;
-#endif
-
-    ninner = 0;
 
     int macro_para = 0;
     enum {para_CALC_COUL_RF, para_CALC_COUL_TAB, para_CALC_ENERGIES, para_ENERGY_GROUPS, 
@@ -211,72 +156,7 @@ NBK_FUNC_NAME(_VgrpF)
 		f,
 		fshift,
 		Vvdw,
-		Vc,
-		nbln,
-		l_cj,
-		type,
-		q,
-		shiftvec,
-		x,
-		nbfp,
-		rcut2,
-		rvdw2,
-		ntype2,
-		facel,
-		nbfp_i,
-		n,
-		ci,
-		ci_sh,
-		ish,
-		ishf,
-		do_LJ,
-		half_LJ,
-		do_coul,
-		do_self,
-		cjind0,
-		cjind1,
-		cjind,
-		ip,
-		jp,
-
-		xi,
-		fi,
-		qi,
-
-		Vvdw_ci,
-		Vc_ci,
-
-		egp_mask,
-		egp_sh_i,
-
-		swV3,
-		swV4,
-		swV5,
-		swF2,
-		swF3,
-		swF4,
-
-		lje_coeff2,
-		lje_coeff6_6,
-		lje_vc,
-		ljc,
-
-		k_rf2,
-
-		k_rf, 
-		c_rf,
-
-		tabscale,
-
-		halfsp,
-
-		#ifndef GMX_DOUBLE
-		tab_coul_FDV0,
-		#else
-		tab_coul_F,
-		tab_coul_V,
-		#endif
-		ninner
+		Vc
     );
     
 
