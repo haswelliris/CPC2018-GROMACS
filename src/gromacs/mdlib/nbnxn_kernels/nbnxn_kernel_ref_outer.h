@@ -155,64 +155,6 @@ NBK_FUNC_NAME(_VgrpF)
     int npair = 0;
 #endif
 
-#ifdef LJ_POT_SWITCH
-    swV3 = ic->vdw_switch.c3;
-    swV4 = ic->vdw_switch.c4;
-    swV5 = ic->vdw_switch.c5;
-    swF2 = 3*ic->vdw_switch.c3;
-    swF3 = 4*ic->vdw_switch.c4;
-    swF4 = 5*ic->vdw_switch.c5;
-#endif
-
-#ifdef LJ_EWALD
-    lje_coeff2   = ic->ewaldcoeff_lj*ic->ewaldcoeff_lj;
-    lje_coeff6_6 = lje_coeff2*lje_coeff2*lje_coeff2/6.0;
-    lje_vc       = ic->sh_lj_ewald;
-
-    ljc          = nbat->nbfp_comb;
-#endif
-
-#ifdef CALC_COUL_RF
-    k_rf2 = 2*ic->k_rf;
-#ifdef CALC_ENERGIES
-    k_rf = ic->k_rf;
-    c_rf = ic->c_rf;
-#endif
-#endif
-#ifdef CALC_COUL_TAB
-    tabscale = ic->tabq_scale;
-#ifdef CALC_ENERGIES
-    halfsp = 0.5/ic->tabq_scale;
-#endif
-
-#ifndef GMX_DOUBLE
-    tab_coul_FDV0 = ic->tabq_coul_FDV0;
-#else
-    tab_coul_F    = ic->tabq_coul_F;
-    tab_coul_V    = ic->tabq_coul_V;
-#endif
-#endif
-
-#ifdef ENERGY_GROUPS
-    egp_mask = (1<<nbat->neg_2log) - 1;
-#endif
-
-
-    rcut2               = ic->rcoulomb*ic->rcoulomb;
-#ifdef VDW_CUTOFF_CHECK
-    rvdw2               = ic->rvdw*ic->rvdw;
-#endif
-
-    ntype2              = nbat->ntype*2;
-    nbfp                = nbat->nbfp;
-    q                   = nbat->q;
-    type                = nbat->type;
-    facel               = ic->epsfac;
-    shiftvec            = shift_vec[0];
-    x                   = nbat->x;
-
-    l_cj = nbl->cj;
-
     ninner = 0;
 
     int macro_para = 0;

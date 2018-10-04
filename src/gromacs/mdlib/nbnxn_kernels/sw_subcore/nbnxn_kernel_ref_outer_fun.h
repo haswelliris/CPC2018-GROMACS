@@ -2,7 +2,7 @@
 #include <math.h>
 
 // custom define
-#define GMX_DOUBLE
+// #define GMX_DOUBLE
 
 #ifdef GMX_DOUBLE
 	typedef double real;
