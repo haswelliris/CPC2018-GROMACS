@@ -144,20 +144,28 @@ NBK_FUNC_NAME(_VgrpF)
     #endif
 
     #define macro_has(para_name) ((macro_para >> para_name) & 1)
+    
+    struct WorkLoadPara workLoadPara;
+    workLoadPara.macro_para = macro_para;
+    workLoadPara.nbl        = nbl;
+    workLoadPara.nbat       = nbat;
+    workLoadPara.ic         = ic;
+    workLoadPara.shift_vec  = shift_vec;
+    workLoadPara.f          = f;
+    workLoadPara.fshift     = fshift;
+    workLoadPara.Vvdw       = Vvdw;
+    workLoadPara.Vc         = Vc;
 
+    // fake subcore
+    int device_core_id;
+    // for (device_core_id = 0; device_core_id < 64; device_core_id++)
+    //     subcore_func(&workLoadPara, device_core_id);
+    subcore_func(&workLoadPara, device_core_id);
+
+    // real subcore
+    // host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara;
     // host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
     // notice_device()；
-    subcore_func(
-    	macro_para,
-    	nbl,
-		nbat,
-		ic,
-		shift_vec,
-		f,
-		fshift,
-		Vvdw,
-		Vc
-    );
     
 
 #ifdef COUNT_PAIRS

@@ -16,6 +16,8 @@
 	#define gmx_invsqrt(x)     (1.0/sqrtf(x))
 #endif
 
+#define HOST_RUN
+
 // end of custom define
 
 //-----------------------------------------------------------------------------------
@@ -237,7 +239,7 @@ typedef struct {
 /* Flags for telling if threads write to force output buffers */
 typedef struct {
 	int			   nflag;	   /* The number of flag blocks						 */
-	unsigned long long int	*flag;		/* Bit i is set when thread i writes to a cell-block */
+	unsigned long int	*flag;		/* Bit i is set when thread i writes to a cell-block */
 	int			   flag_nalloc; /* Allocation size of cxy_flag					   */
 } nbnxn_buffer_flags_t;
 

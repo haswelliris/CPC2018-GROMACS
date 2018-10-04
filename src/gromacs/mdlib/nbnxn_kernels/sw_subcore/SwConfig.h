@@ -9,7 +9,7 @@
         #define DEVICE_ACTION_EXIT                  999
         #define DEVICE_ACTION_RUN                   666
     // ---- CUSTOM PARAM
-    #define CURRENT_PTR_HEAD                3
+    #define WORKLOADPARA                    3
     #define OTHER_PTR_HEAD                  4
     #define SMALL_BLOCK_N                   5
     #define SMALL_BLOCK_X                   6
@@ -34,6 +34,18 @@ struct InitParam
     int *walls, *flags;
     float nu, omega, CSmago;
     // ----
+};
+
+struct WorkLoadPara {
+    int                         macro_para;
+    nbnxn_pairlist_t            *nbl;
+    nbnxn_atomdata_t            *nbat;
+    interaction_const_t         *ic;
+    rvec                        *shift_vec;
+    real                        *f;
+    real                        *fshift;
+    real                        *Vvdw;
+    real                        *Vc;
 };
 
 // ---- CUSTOM CONFIG

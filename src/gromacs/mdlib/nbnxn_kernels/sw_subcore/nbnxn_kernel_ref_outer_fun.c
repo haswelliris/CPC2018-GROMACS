@@ -1,6 +1,25 @@
 #include "nbnxn_kernel_ref_outer_fun.h"
+#include "SwConfig.h"
+
+#ifdef HOST_RUN
+	#include <string.h>
+#else
+	#include "SwDevice.h"
+#endif
+
+#include <string.h>
 
 // asign
+
+int 						macro_para;
+const nbnxn_pairlist_t		*nbl; // 会用到这个结构体里少量值
+const nbnxn_atomdata_t		*nbat; // 会用到这个结构体里比较多的东西
+const interaction_const_t	*ic; // 用于大量初始化，inner中也有很多使用
+rvec					 	*shift_vec; // 不需要传入，已提取到shiftvec
+real					 	*f; // 会被更改的量，有规约！
+real					 	*fshift; // 会被更改的量，有规约！
+real					 	*Vvdw; // 会被更改的量，有规约！
+real					 	*Vc; // 会被更改的量，有规约！
 
 const nbnxn_ci_t 			*nbln; // 每次迭代值开始初始化，只在从核使用，使用其对象成员
 const nbnxn_cj_t 			*l_cj; // 局部变量，初始化后在循环内不变，使用数组内容
@@ -67,17 +86,31 @@ real						halfsp; // 初始化后保持不变
 	const real 				*tab_coul_V; // 初始化后在循环内不变，使用其数组内容
 #endif
 
-void subcore_func(
-		int 						macro_para,
-		const nbnxn_pairlist_t		*nbl, // 会用到这个结构体里少量值
-		const nbnxn_atomdata_t		*nbat, // 会用到这个结构体里比较多的东西
-		const interaction_const_t	*ic, // 用于大量初始化，inner中也有很多使用
-		rvec					 	*shift_vec, // 不需要传入，已提取到shiftvec
-		real					 	*f, // 会被更改的量，有规约！
-		real					 	*fshift, // 会被更改的量，有规约！
-		real					 	*Vvdw, // 会被更改的量，有规约！
-		real					 	*Vc // 会被更改的量，有规约！
-	) {
+struct WorkLoadPara workLoadPara;
+
+// 注意上从核这里要加extern
+#ifdef HOST_RUN
+void subcore_func(struct WorkLoadPara *workLoadPara_pass, int device_core_id)
+#else
+void subcore_func()
+#endif
+{
+
+	#ifdef HOST_RUN
+		memcpy(&workLoadPara, workLoadPara_pass, sizeof(struct WorkLoadPara));
+	#else
+		sync_get(&workLoadPara, workLoadPara_pass, sizeof(struct WorkLoadPara));
+	#endif
+
+	macro_para = workLoadPara.macro_para;
+	nbl = workLoadPara.nbl;
+	nbat = workLoadPara.nbat;
+	ic = workLoadPara.ic;
+	shift_vec = workLoadPara.shift_vec;
+	f = workLoadPara.f;
+	fshift = workLoadPara.fshift;
+	Vvdw = workLoadPara.Vvdw;
+	Vc = workLoadPara.Vc;
 
 	// init
 
@@ -144,7 +177,9 @@ void subcore_func(
 
 	// end init
 
-	for (n = nbl->nci -1; n >= 0; n--)
+	for (n = 0; n < nbl->nci; n++)
+	// int task_num = BLOCK_SIZE(device_core_id, 64, nbl->nci);
+	// for (n = BLOCK_HEAD(device_core_id, 64, nbl->nci); task_num; task_num--)
 	{
 		int i, d;
 
