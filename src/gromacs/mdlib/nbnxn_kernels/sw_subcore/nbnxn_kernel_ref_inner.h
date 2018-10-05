@@ -60,8 +60,6 @@ else {
 
     cj = l_cj.cj;
 
-    if (BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end) || 
-        BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end)) {
 
     if (macro_has(para_ENERGY_GROUPS))
         egp_cj = nbat.energrp[cj];
@@ -292,10 +290,8 @@ else {
                 if (macro_has(para_CALC_ENERGIES)) {
                     if (macro_has(para_ENERGY_GROUPS))
                         Vvdw[egp_sh_i[i]+((egp_cj>>(nbat.neg_2log*j)) & egp_mask)] += VLJ;
-                    else {
-                        // Vvdw_ci += VLJ;
-                        *Vvdw += VLJ;
-                    }
+                    else
+                        Vvdw_ci += VLJ;
                 /* 1 flop for LJ energy addition */
                 }
             }
@@ -353,10 +349,8 @@ else {
             if (macro_has(para_CALC_ENERGIES)) {
                 if (macro_has(para_ENERGY_GROUPS))
                     Vc[egp_sh_i[i]+((egp_cj>>(nbat.neg_2log*j)) & egp_mask)] += vcoul;
-                else {
-                    // Vc_ci += vcoul;
-                    *Vc   += vcoul;
-                }
+                else
+                    Vc_ci += vcoul;
                 /* 1 flop for Coulomb energy addition */
             }
 #endif
@@ -402,8 +396,6 @@ else {
         }
     }
 }
-
-} // end of BLOCK_HINT
 
 #undef interact
 // #undef EXCL_FORCES

@@ -156,9 +156,6 @@ NBK_FUNC_NAME(_VgrpF)
     workLoadPara.Vvdw       = Vvdw;
     workLoadPara.Vc         = Vc;
 
-    if ((nbat->natoms*F_STRIDE)%12!=0)
-        printf("(nbat->natoms*F_STRIDE)%12!=0\n");
-
     // fake subcore
     int device_core_id;
     for (device_core_id = 0; device_core_id < 64; device_core_id++)
