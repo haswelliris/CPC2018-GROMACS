@@ -383,9 +383,11 @@ else {
             fi[i*FI_STRIDE+YY] += fy;
             fi[i*FI_STRIDE+ZZ] += fz;
             /* Decrement j-atom force */
-            f[aj*F_STRIDE+XX]  -= fx;
-            f[aj*F_STRIDE+YY]  -= fy;
-            f[aj*F_STRIDE+ZZ]  -= fz;
+            if (BLOCK_HINT(cj*UNROLLJ*F_STRIDE, f_start, f_end)) {
+                f[aj*F_STRIDE+XX]  -= fx;
+                f[aj*F_STRIDE+YY]  -= fy;
+                f[aj*F_STRIDE+ZZ]  -= fz;
+            }
             /* 9 flops for force addition */
         }
     }
