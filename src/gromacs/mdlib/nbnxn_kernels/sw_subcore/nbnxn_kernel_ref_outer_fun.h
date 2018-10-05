@@ -54,6 +54,7 @@
 #define N_BOX_X (2*D_BOX_X+1)
 #define N_IVEC  (N_BOX_Z*N_BOX_Y*N_BOX_X)
 #define CENTRAL (N_IVEC/2)
+#define SHIFTS  N_IVEC
 
 
 #define DIM     3 /* Dimension of vectors    */

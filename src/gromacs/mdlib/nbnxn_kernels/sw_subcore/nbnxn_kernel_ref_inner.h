@@ -60,6 +60,8 @@ else {
 
     cj = l_cj.cj;
 
+    if (BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end) || 
+        BLOCK_HINT(cj*UNROLLJ*F_STRIDE, f_start, f_end)) {
 
     if (macro_has(para_ENERGY_GROUPS))
         egp_cj = nbat.energrp[cj];
@@ -387,6 +389,7 @@ else {
             /* 9 flops for force addition */
         }
     }
+    } // end of block_hint test
 }
 
 #undef interact

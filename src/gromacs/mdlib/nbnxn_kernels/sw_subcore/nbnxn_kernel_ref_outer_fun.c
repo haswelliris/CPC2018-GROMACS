@@ -197,9 +197,12 @@ void subcore_func()
 
     // printf("%d\n", nbl.ncj);
 
-	// for (n = 0; n < nbl.nci; n++)
-	int task_num = BLOCK_SIZE(device_core_id, 64, nbl.nci);
-	for (n = BLOCK_HEAD(device_core_id, 64, nbl.nci); task_num; task_num--, n++)
+    int f_start = BLOCK_HEAD(device_core_id, 64, nbat.natoms*F_STRIDE);
+    int f_end = f_start + BLOCK_SIZE(device_core_id, 64, nbat.natoms*F_STRIDE);
+    
+	for (n = 0; n < nbl.nci; n++)
+	// int task_num = BLOCK_SIZE(device_core_id, 64, nbl.nci);
+	// for (n = BLOCK_HEAD(device_core_id, 64, nbl.nci); task_num; task_num--, n++)
 	{
 		int i, d;
 
@@ -348,6 +351,8 @@ void subcore_func()
 		}
 		// ninner += cjind1 - cjind0;
 
+		if (BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end)) {
+
 		/* Add accumulated i-forces to the force array */
 		for (i = 0; i < UNROLLI; i++)
 		{
@@ -376,5 +381,7 @@ void subcore_func()
 				*Vc   += Vc_ci;
 			}
 		}
+
+		} // end of ci write test
 	}
 }
