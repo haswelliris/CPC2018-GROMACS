@@ -61,7 +61,7 @@ else {
     cj = l_cj.cj;
 
     if (BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end) || 
-        BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end)) {
+        BLOCK_HINT(cj*UNROLLJ*F_STRIDE, f_start, f_end)) {
 
     if (macro_has(para_ENERGY_GROUPS))
         egp_cj = nbat.energrp[cj];
@@ -386,18 +386,22 @@ else {
             // fi[i*FI_STRIDE+XX] += fx;
             // fi[i*FI_STRIDE+YY] += fy;
             // fi[i*FI_STRIDE+ZZ] += fz;
-            f[(ci*UNROLLI+i)*F_STRIDE+XX] += fx;
-            f[(ci*UNROLLI+i)*F_STRIDE+YY] += fy;
-            f[(ci*UNROLLI+i)*F_STRIDE+ZZ] += fz;
+            if (BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end)) {
+                f_local[(ci*UNROLLI+i)*F_STRIDE+XX-f_start] += fx;
+                f_local[(ci*UNROLLI+i)*F_STRIDE+YY-f_start] += fy;
+                f_local[(ci*UNROLLI+i)*F_STRIDE+ZZ-f_start] += fz;
+            }
             if (fshift != NULL) {
                 fshift[ishf+XX] += fx;
                 fshift[ishf+YY] += fy;
                 fshift[ishf+ZZ] += fz;
             }
             /* Decrement j-atom force */
-            f[aj*F_STRIDE+XX]  -= fx;
-            f[aj*F_STRIDE+YY]  -= fy;
-            f[aj*F_STRIDE+ZZ]  -= fz;
+            if (BLOCK_HINT(cj*UNROLLJ*F_STRIDE, f_start, f_end)) {
+                f_local[aj*F_STRIDE+XX-f_start]  -= fx;
+                f_local[aj*F_STRIDE+YY-f_start]  -= fy;
+                f_local[aj*F_STRIDE+ZZ-f_start]  -= fz;
+            }
             /* 9 flops for force addition */
         }
     }

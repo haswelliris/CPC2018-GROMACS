@@ -5,10 +5,15 @@
 	#include <string.h>
 	#define aget_mem(A, B, C) memcpy(A, B, C)
 	#define sget_mem(A, B, C) memcpy(A, B, C)
+	#define put_mem(A, B, C) memcpy(A, B, C)
+	#define alloc(A) malloc(A)
 #else
 	#include "SwDevice.h"
 	#define aget_mem(A, B, C) async_get(A, B, C)
 	#define sget_mem(A, B, C) sync_get(A, B, C)
+	#define put_mem(A, B, C) sync_put(A, B, C)
+	#define alloc(A) device_malloc(A)
+	#define free(A) ldm_free(A)
 #endif
 
 
@@ -112,11 +117,16 @@ void subcore_func()
 	Vvdw = workLoadPara.Vvdw;
 	Vc = workLoadPara.Vc;
 
+    int f_start = BLOCK_HEAD(device_core_id, 64, nbat.natoms/4)*12;
+    int f_end = f_start + BLOCK_SIZE(device_core_id, 64, nbat.natoms/4)*12;
+    real *f_local = alloc(sizeof(real)*(f_end-f_start));
+
 	// load obj
 
 	aget_mem(&nbl, workLoadPara.nbl, sizeof(nbnxn_pairlist_t));
 	aget_mem(&nbat, workLoadPara.nbat, sizeof(nbnxn_atomdata_t));
 	aget_mem(&ic, workLoadPara.ic, sizeof(interaction_const_t));
+	aget_mem(f_local, workLoadPara.f+f_start, sizeof(real)*(f_end-f_start));
 
 	#ifndef HOST_RUN
 		wait_all_async_get();
@@ -194,9 +204,6 @@ void subcore_func()
     // l_cj = nbl.cj;
 
 	// end init
-
-    int f_start = BLOCK_HEAD(device_core_id, 64, nbat.natoms*F_STRIDE);
-    int f_end = f_start + BLOCK_SIZE(device_core_id, 64, nbat.natoms*F_STRIDE);
 
 	for (n = 0; n < nbl.nci; n++)
 	// int task_num = BLOCK_SIZE(device_core_id, 64, nbl.nci);
@@ -378,4 +385,6 @@ void subcore_func()
 		// 	}
 		// }
 	}
+	put_mem(workLoadPara.f+f_start, f_local, sizeof(real)*(f_end-f_start));
+	free(f_local);
 }
