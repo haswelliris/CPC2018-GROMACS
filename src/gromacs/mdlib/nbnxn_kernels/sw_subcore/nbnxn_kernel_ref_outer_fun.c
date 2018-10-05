@@ -349,25 +349,25 @@ void subcore_func()
 		// ninner += cjind1 - cjind0;
 
 		/* Add accumulated i-forces to the force array */
-		// for (i = 0; i < UNROLLI; i++)
-		// {
-		// 	for (d = 0; d < DIM; d++)
-		// 	{
-		// 		f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
-		// 	}
-		// }
+		for (i = 0; i < UNROLLI; i++)
+		{
+			for (d = 0; d < DIM; d++)
+			{
+				f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
+			}
+		}
 		// #ifdef CALC_SHIFTFORCES
-		// if (fshift != NULL)
-		// {
-		// 	/* Add i forces to shifted force list */
-		// 	for (i = 0; i < UNROLLI; i++)
-		// 	{
-		// 		for (d = 0; d < DIM; d++)
-		// 		{
-		// 			fshift[ishf+d] += fi[i*FI_STRIDE+d];
-		// 		}
-		// 	}
-		// }
+		if (fshift != NULL)
+		{
+			/* Add i forces to shifted force list */
+			for (i = 0; i < UNROLLI; i++)
+			{
+				for (d = 0; d < DIM; d++)
+				{
+					fshift[ishf+d] += fi[i*FI_STRIDE+d];
+				}
+			}
+		}
 		// #endif
 
 		if (macro_has(para_CALC_ENERGIES)) {
