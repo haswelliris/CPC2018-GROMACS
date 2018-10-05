@@ -36,7 +36,7 @@
 #define UNROLLI    NBNXN_CPU_CLUSTER_I_SIZE
 #define UNROLLJ    NBNXN_CPU_CLUSTER_I_SIZE
 
-/* We could use para_nbat->xstride and para_nbat->fstride, but macros might be faster */
+/* We could use host_func_para.nbat->xstride and host_func_para.nbat->fstride, but macros might be faster */
 #define X_STRIDE   3
 #define F_STRIDE   3
 /* Local i-atom buffer strides */
@@ -91,37 +91,21 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
 #undef NBK_FUNC_NAME
 #undef NBK_FUNC_NAME2
-(const nbnxn_pairlist_t     *para_nbl,
- const nbnxn_atomdata_t     *para_nbat,
- const interaction_const_t  *para_ic,
- rvec                       *para_shift_vec,
- real                       *para_f
-#ifdef CALC_SHIFTFORCES
- ,
- real                       *para_fshift
-#endif
-#ifdef CALC_ENERGIES
- ,
- real                       *para_Vvdw,
- real                       *para_Vc
-#endif
-)
+()
 {
     // =========== DEF DATA =============
     const nbnxn_ci_t   *nbln;
     const nbnxn_cj_t   *l_cj;
     const int          *type;
     const real         *q;
-    const real         *para_shiftvec;
+    const real         *func_para_shiftvec;
     const real         *x;
     const real         *nbfp;
     real                rcut2;
-#ifdef VDW_CUTOFF_CHECK
-    real                rvdw2;
-#endif
+
     int                 ntype2;
     real                facel;
-    real               *nbfp_i;
+    real               *nbfp_i; // UNUSED
     int                 n, ci, ci_sh;
     int                 ish, ishf;
     gmx_bool            do_LJ, half_LJ, do_coul, do_self;
@@ -133,21 +117,7 @@ NBK_FUNC_NAME(_VgrpF)
     real                qi[UNROLLI];
 
 #ifdef CALC_ENERGIES
-#ifndef ENERGY_GROUPS
-
     real       Vvdw_ci, Vc_ci;
-#else
-    int        egp_mask;
-    int        egp_sh_i[UNROLLI];
-#endif
-#endif
-#ifdef LJ_POT_SWITCH
-    real       swV3, swV4, swV5;
-    real       swF2, swF3, swF4;
-#endif
-#ifdef LJ_EWALD
-    real        lje_coeff2, lje_coeff6_6, lje_vc;
-    const real *ljc;
 #endif
 
 #ifdef CALC_COUL_RF
@@ -171,68 +141,44 @@ NBK_FUNC_NAME(_VgrpF)
     // =========== DEF DATA =============
 
     // =========== INIT DATA =============
-#ifdef LJ_POT_SWITCH
-    swV3 = para_ic->vdw_switch.c3;
-    swV4 = para_ic->vdw_switch.c4;
-    swV5 = para_ic->vdw_switch.c5;
-    swF2 = 3*para_ic->vdw_switch.c3;
-    swF3 = 4*para_ic->vdw_switch.c4;
-    swF4 = 5*para_ic->vdw_switch.c5;
-#endif
-
-#ifdef LJ_EWALD
-    lje_coeff2   = para_ic->ewaldcoeff_lj*para_ic->ewaldcoeff_lj;
-    lje_coeff6_6 = lje_coeff2*lje_coeff2*lje_coeff2/6.0;
-    lje_vc       = para_ic->sh_lj_ewald;
-
-    ljc          = para_nbat->nbfp_comb;
-#endif
-
 #ifdef CALC_COUL_RF
-    k_rf2 = 2*para_ic->k_rf;
+    k_rf2 = 2*host_func_para.ic->k_rf;
 #ifdef CALC_ENERGIES
-    k_rf = para_ic->k_rf;
-    c_rf = para_ic->c_rf;
+    k_rf = host_func_para.ic->k_rf;
+    c_rf = host_func_para.ic->c_rf;
 #endif
 #endif
 #ifdef CALC_COUL_TAB
-    tabscale = para_ic->tabq_scale;
+    tabscale = host_func_para.ic->tabq_scale;
 #ifdef CALC_ENERGIES
-    halfsp = 0.5/para_ic->tabq_scale;
+    halfsp = 0.5/host_func_para.ic->tabq_scale;
 #endif
 
 #ifndef GMX_DOUBLE
-    tab_coul_FDV0 = para_ic->tabq_coul_FDV0;
+    tab_coul_FDV0 = host_func_para.ic->tabq_coul_FDV0;
 #else
-    tab_coul_F    = para_ic->tabq_coul_F;
-    tab_coul_V    = para_ic->tabq_coul_V;
+    tab_coul_F    = host_func_para.ic->tabq_coul_F;
+    tab_coul_V    = host_func_para.ic->tabq_coul_V;
 #endif
 #endif
 
-#ifdef ENERGY_GROUPS
-    egp_mask = (1<<para_nbat->neg_2log) - 1;
-#endif
 
+    rcut2               = host_func_para.ic->rcoulomb*host_func_para.ic->rcoulomb;
 
-    rcut2               = para_ic->rcoulomb*para_ic->rcoulomb;
-#ifdef VDW_CUTOFF_CHECK
-    rvdw2               = para_ic->rvdw*para_ic->rvdw;
-#endif
+    ntype2              = host_func_para.nbat->ntype*2;
+    nbfp                = host_func_para.nbat->nbfp;
+    q                   = host_func_para.nbat->q;
+    type                = host_func_para.nbat->type;
+    facel               = host_func_para.ic->epsfac;
+    func_para_shiftvec            = host_func_para.shift_vec[0];
+    x                   = host_func_para.nbat->x;
 
-    ntype2              = para_nbat->ntype*2;
-    nbfp                = para_nbat->nbfp;
-    q                   = para_nbat->q;
-    type                = para_nbat->type;
-    facel               = para_ic->epsfac;
-    para_shiftvec            = para_shift_vec[0];
-    x                   = para_nbat->x;
-
-    l_cj = para_nbl->cj;
+    l_cj = host_func_para.nbl->cj;
     // =========== INIT DATA =============
 
     /* =========== DATA'S STAT =========== //
-    int ci_SZ = para_nbl->nci;
-    int cj_SZ = para_nbl->ncj;
+    int ci_SZ = host_func_para.nbl->nci;
+    int cj_SZ = host_func_para.nbl->ncj;
     int i, j, k;
 
     for(k = 0; k < 64; ++k)
@@ -243,13 +189,13 @@ NBK_FUNC_NAME(_VgrpF)
             printf("ci_SZ =%d, cj_SZ =%d\n\n", ci_SZ, cj_SZ);
             for(i = 0; i < ci_SZ; ++i)
             {
-                nbln = &para_nbl->ci[i];
+                nbln = &host_func_para.nbl->ci[i];
                 printf("ci[%d]'s info:\n", i);
                 printf("ci =%d, cjind0 =%d, cjind1 =%d\n", nbln->ci, nbln->cj_ind_start, nbln->cj_ind_end);
                 printf("cj list = [");
                 for(j = nbln->cj_ind_start; j < nbln->cj_ind_end; ++j)
                 {
-                    printf("%d, ", para_nbl->cj[j].cj);
+                    printf("%d, ", host_func_para.nbl->cj[j].cj);
                 }
                 printf("]\n\n");
             }
@@ -264,14 +210,17 @@ NBK_FUNC_NAME(_VgrpF)
 
     // =========== DATA'S STAT =========== */
 
-    for (n = 0; n < para_nbl->nci; n++)
+    //int start_nci = BLOCK_HEAD(device_core_id, 64, host_func_para.nbl->nci);
+    //int end_nci = start_nci + BLOCK_SIZE(device_core_id, 64, host_func_para.nbl->nci);
+
+    for (n = 0; n < host_func_para.nbl->nci; n++)
     {
         int i, d;
 
-        nbln = &para_nbl->ci[n];
+        nbln = &host_func_para.nbl->ci[n];
 
         ish              = (nbln->shift & NBNXN_CI_SHIFT);
-        /* x, para_f and para_fshift are assumed to be stored with stride 3 */
+        /* x, host_func_para.f and host_func_para.fshift are assumed to be stored with stride 3 */
         ishf             = ish*DIM;
         cjind0           = nbln->cj_ind_start;
         cjind1           = nbln->cj_ind_end;
@@ -288,29 +237,20 @@ NBK_FUNC_NAME(_VgrpF)
         do_LJ   = (nbln->shift & NBNXN_CI_DO_LJ(0));
         do_coul = (nbln->shift & NBNXN_CI_DO_COUL(0));
         half_LJ = ((nbln->shift & NBNXN_CI_HALF_LJ(0)) || !do_LJ) && do_coul;
-#ifdef LJ_EWALD
-        do_self = TRUE;
-#else
+    
         do_self = do_coul;
-#endif
 
 #ifdef CALC_ENERGIES
-#ifndef ENERGY_GROUPS
         Vvdw_ci = 0;
         Vc_ci   = 0;
-#else
-        for (i = 0; i < UNROLLI; i++)
-        {
-            egp_sh_i[i] = ((para_nbat->energrp[ci]>>(i*para_nbat->neg_2log)) & egp_mask)*para_nbat->nenergrp;
-        }
-#endif
 #endif
 
+        //TODO: ldm load: x, q， func_para_shiftvec
         for (i = 0; i < UNROLLI; i++)
         {
             for (d = 0; d < DIM; d++)
             {
-                xi[i*XI_STRIDE+d] = x[(ci*UNROLLI+i)*X_STRIDE+d] + para_shiftvec[ishf+d];
+                xi[i*XI_STRIDE+d] = x[(ci*UNROLLI+i)*X_STRIDE+d] + func_para_shiftvec[ishf+d];
                 fi[i*FI_STRIDE+d] = 0;
             }
 
@@ -337,45 +277,35 @@ NBK_FUNC_NAME(_VgrpF)
             {
                 for (i = 0; i < UNROLLI; i++)
                 {
-                    int egp_ind;
-#ifdef ENERGY_GROUPS
-                    egp_ind = egp_sh_i[i] + ((para_nbat->energrp[ci]>>(i*para_nbat->neg_2log)) & egp_mask);
-#else
-                    egp_ind = 0;
-#endif
+                    //TODO: REDUCE SUM
                     /* Coulomb self interaction */
-                    para_Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
-
-#ifdef LJ_EWALD
-                    /* LJ Ewald self interaction */
-                    para_Vvdw[egp_ind] += 0.5*para_nbat->nbfp[para_nbat->type[ci*UNROLLI+i]*(para_nbat->ntype + 1)*2]/6*lje_coeff6_6;
-#endif
+                    host_func_para.Vc[0]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
                 }
             }
         }
 #endif  /* CALC_ENERGIES */
 
         cjind = cjind0;
-        while (cjind < cjind1 && para_nbl->cj[cjind].excl != 0xffff)
+        while (cjind < cjind1 && host_func_para.nbl->cj[cjind].excl != 0xffff)
         {
 #define CHECK_EXCLS
             if (half_LJ)
             {
 #define CALC_COULOMB
 #define HALF_LJ
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_ref_inner.h"
 #undef HALF_LJ
 #undef CALC_COULOMB
             }
             else if (do_coul)
             {
 #define CALC_COULOMB
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_ref_inner.h"
 #undef CALC_COULOMB
             }
             else
             {
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_ref_inner.h"
             }
 #undef CHECK_EXCLS
             cjind++;
@@ -387,19 +317,19 @@ NBK_FUNC_NAME(_VgrpF)
             {
 #define CALC_COULOMB
 #define HALF_LJ
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_ref_inner.h"
 #undef HALF_LJ
 #undef CALC_COULOMB
             }
             else if (do_coul)
             {
 #define CALC_COULOMB
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_ref_inner.h"
 #undef CALC_COULOMB
             }
             else
             {
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_inner.h"
+#include "nbnxn_kernel_ref_inner.h"
             }
         }
 
@@ -408,28 +338,29 @@ NBK_FUNC_NAME(_VgrpF)
         {
             for (d = 0; d < DIM; d++)
             {
-                para_f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
+                //TODO: REDUCE SUM
+                host_func_para.f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
             }
         }
 #ifdef CALC_SHIFTFORCES
-        if (para_fshift != NULL)
+        if (host_func_para.fshift != NULL)
         {
             /* Add i forces to shifted force list */
             for (i = 0; i < UNROLLI; i++)
             {
                 for (d = 0; d < DIM; d++)
                 {
-                    para_fshift[ishf+d] += fi[i*FI_STRIDE+d];
+                    //TODO: REDUCE SUM
+                    host_func_para.fshift[ishf+d] += fi[i*FI_STRIDE+d];
                 }
             }
         }
 #endif
 
 #ifdef CALC_ENERGIES
-#ifndef ENERGY_GROUPS
-        *para_Vvdw += Vvdw_ci;
-        *para_Vc   += Vc_ci;
-#endif
+        //TODO: REDUCE SUM
+        *host_func_para.Vvdw += Vvdw_ci;
+        *host_func_para.Vc   += Vc_ci;
 #endif
     }
 }
@@ -443,3 +374,4 @@ NBK_FUNC_NAME(_VgrpF)
 
 #undef UNROLLI
 #undef UNROLLJ
+

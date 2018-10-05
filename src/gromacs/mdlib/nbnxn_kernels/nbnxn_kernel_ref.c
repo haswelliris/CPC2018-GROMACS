@@ -62,124 +62,9 @@ extern "C" {
 /*! \brief Typedefs for declaring lookup tables of kernel functions.
  */
 
-typedef void (*p_nbk_func_noener)(const nbnxn_pairlist_t     *nbl,
-                                  const nbnxn_atomdata_t     *nbat,
-                                  const interaction_const_t  *ic,
-                                  rvec                       *shift_vec,
-                                  real                       *f,
-                                  real                       *fshift);
+typedef void (*p_nbk_func_noener)();
 
-typedef void (*p_nbk_func_ener)(const nbnxn_pairlist_t     *nbl,
-                                const nbnxn_atomdata_t     *nbat,
-                                const interaction_const_t  *ic,
-                                rvec                       *shift_vec,
-                                real                       *f,
-                                real                       *fshift,
-                                real                       *Vvdw,
-                                real                       *Vc);
-
-/* Analytical reaction-field kernels */
-#define CALC_COUL_RF
-#define LJ_CUT
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_CUT
-#define LJ_FORCE_SWITCH
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_FORCE_SWITCH
-#define LJ_POT_SWITCH
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_POT_SWITCH
-#define LJ_EWALD
-#define LJ_CUT
-#define LJ_EWALD_COMB_GEOM
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_EWALD_COMB_GEOM
-#define LJ_EWALD_COMB_LB
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_EWALD_COMB_LB
-#undef LJ_CUT
-#undef LJ_EWALD
-#undef CALC_COUL_RF
-
-
-/* Tabulated exclusion interaction electrostatics kernels */
-#define CALC_COUL_TAB
-#define LJ_CUT
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_CUT
-#define LJ_FORCE_SWITCH
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_FORCE_SWITCH
-#define LJ_POT_SWITCH
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_POT_SWITCH
-#define LJ_EWALD
-#define LJ_CUT
-#define LJ_EWALD_COMB_GEOM
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_EWALD_COMB_GEOM
-#define LJ_EWALD_COMB_LB
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_EWALD_COMB_LB
-#undef LJ_CUT
-#undef LJ_EWALD
-/* Twin-range cut-off kernels */
-#define VDW_CUTOFF_CHECK
-#define LJ_CUT
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_CUT
-#define LJ_FORCE_SWITCH
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_FORCE_SWITCH
-#define LJ_POT_SWITCH
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_POT_SWITCH
-#define LJ_EWALD
-#define LJ_CUT
-#define LJ_EWALD_COMB_GEOM
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_EWALD_COMB_GEOM
-#define LJ_EWALD_COMB_LB
-#include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_ref_includes.h"
-#undef LJ_EWALD_COMB_LB
-#undef LJ_CUT
-#undef LJ_EWALD
-#undef VDW_CUTOFF_CHECK
-#undef CALC_COUL_TAB
-
-
-enum {
-    coultRF, coultTAB, coultTAB_TWIN, coultNR
-};
-
-enum {
-    vdwtCUT, vdwtFSWITCH, vdwtPSWITCH, vdwtEWALDGEOM, vdwtEWALDLB, vdwtNR
-};
-
-p_nbk_func_noener p_nbk_c_noener[coultNR][vdwtNR] =
-{
-    { nbnxn_kernel_ElecRF_VdwLJ_F_ref,           nbnxn_kernel_ElecRF_VdwLJFsw_F_ref,           nbnxn_kernel_ElecRF_VdwLJPsw_F_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombGeom_F_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombLB_F_ref           },
-    { nbnxn_kernel_ElecQSTab_VdwLJ_F_ref,        nbnxn_kernel_ElecQSTab_VdwLJFsw_F_ref,        nbnxn_kernel_ElecQSTab_VdwLJPsw_F_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombGeom_F_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombLB_F_ref        },
-    { nbnxn_kernel_ElecQSTabTwinCut_VdwLJ_F_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJFsw_F_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJPsw_F_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombGeom_F_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombLB_F_ref }
-};
-
-p_nbk_func_ener p_nbk_c_ener[coultNR][vdwtNR] =
-{
-    { nbnxn_kernel_ElecRF_VdwLJ_VF_ref,           nbnxn_kernel_ElecRF_VdwLJFsw_VF_ref,           nbnxn_kernel_ElecRF_VdwLJPsw_VF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombGeom_VF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombLB_VF_ref            },
-    { nbnxn_kernel_ElecQSTab_VdwLJ_VF_ref,        nbnxn_kernel_ElecQSTab_VdwLJFsw_VF_ref,        nbnxn_kernel_ElecQSTab_VdwLJPsw_VF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombGeom_VF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombLB_VF_ref         },
-    { nbnxn_kernel_ElecQSTabTwinCut_VdwLJ_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJFsw_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJPsw_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombGeom_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombLB_VF_ref  }
-};
-
-#ifdef SW_ENERGRP /* in SwConfig */
-
-p_nbk_func_ener p_nbk_c_energrp[coultNR][vdwtNR] =
-{
-    { nbnxn_kernel_ElecRF_VdwLJ_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJFsw_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJPsw_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombGeom_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombLB_VgrpF_ref           },
-    { nbnxn_kernel_ElecQSTab_VdwLJ_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJFsw_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJPsw_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombGeom_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombLB_VgrpF_ref        },
-    { nbnxn_kernel_ElecQSTabTwinCut_VdwLJ_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJFsw_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJPsw_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombGeom_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombLB_VgrpF_ref }
-};
-
-#endif
+typedef void (*p_nbk_func_ener)();
 
 #ifdef __cplusplus
 extern "C" {
@@ -196,8 +81,162 @@ typedef struct {
     real                       *Vc;
 } func_para_t;
 
+func_para_t host_func_para;
+
 #ifdef __cplusplus
 }
+#endif
+
+/* Analytical reaction-field kernels */
+//++++++++++++++++++++++++++++++++++++
+#define CALC_COUL_RF
+    //===================================
+    #define LJ_CUT
+    #include "nbnxn_kernel_ref_includes.h"
+    #undef LJ_CUT
+
+    #ifndef SW_TEST_FUNC /* in SwConfig.h */
+        #define LJ_FORCE_SWITCH
+        #include "nbnxn_kernel_ref_includes.h"
+        #undef LJ_FORCE_SWITCH
+
+        #define LJ_POT_SWITCH
+        #include "nbnxn_kernel_ref_includes.h"
+        #undef LJ_POT_SWITCH
+
+        #define LJ_EWALD
+            #define LJ_CUT
+                #define LJ_EWALD_COMB_GEOM
+                #include "nbnxn_kernel_ref_includes.h"
+                #undef LJ_EWALD_COMB_GEOM
+
+                #define LJ_EWALD_COMB_LB
+                #include "nbnxn_kernel_ref_includes.h"
+                #undef LJ_EWALD_COMB_LB
+            #undef LJ_CUT
+        #undef LJ_EWALD
+    #endif
+    //====================================
+#undef CALC_COUL_RF
+//++++++++++++++++++++++++++++++++++++
+
+
+/* Tabulated exclusion interaction electrostatics kernels */
+//++++++++++++++++++++++++++++++++++++
+#define CALC_COUL_TAB
+    //====================================
+    #define LJ_CUT
+    #include "nbnxn_kernel_ref_includes.h"
+    #undef LJ_CUT
+
+    #ifndef SW_TEST_FUNC /* in SwConfig.h */
+        #define LJ_FORCE_SWITCH
+        #include "nbnxn_kernel_ref_includes.h"
+        #undef LJ_FORCE_SWITCH
+    
+        #define LJ_POT_SWITCH
+        #include "nbnxn_kernel_ref_includes.h"
+        #undef LJ_POT_SWITCH
+
+        #define LJ_EWALD
+            #define LJ_CUT
+                #define LJ_EWALD_COMB_GEOM
+                #include "nbnxn_kernel_ref_includes.h"
+                #undef LJ_EWALD_COMB_GEOM
+
+                #define LJ_EWALD_COMB_LB
+                #include "nbnxn_kernel_ref_includes.h"
+                #undef LJ_EWALD_COMB_LB
+            #undef LJ_CUT
+        #undef LJ_EWALD
+    #endif
+    //====================================
+
+
+
+    /* Twin-range cut-off kernels */
+    //====================================
+    #ifndef SW_TEST_FUNC /* in SwConfig.h */
+
+    #define VDW_CUTOFF_CHECK
+        #define LJ_CUT
+        #include "nbnxn_kernel_ref_includes.h"
+        #undef LJ_CUT
+
+        #define LJ_FORCE_SWITCH
+        #include "nbnxn_kernel_ref_includes.h"
+        #undef LJ_FORCE_SWITCH
+
+        #define LJ_POT_SWITCH
+        #include "nbnxn_kernel_ref_includes.h"
+        #undef LJ_POT_SWITCH
+
+        #define LJ_EWALD
+            #define LJ_CUT
+                #define LJ_EWALD_COMB_GEOM
+                #include "nbnxn_kernel_ref_includes.h"
+                #undef LJ_EWALD_COMB_GEOM
+
+                #define LJ_EWALD_COMB_LB
+                #include "nbnxn_kernel_ref_includes.h"
+                #undef LJ_EWALD_COMB_LB
+            #undef LJ_CUT
+        #undef LJ_EWALD
+    #undef VDW_CUTOFF_CHECK
+
+    #endif
+    //====================================
+#undef CALC_COUL_TAB
+//++++++++++++++++++++++++++++++++++++
+
+enum {
+    coultRF, coultTAB, coultTAB_TWIN, coultNR
+};
+
+enum {
+    vdwtCUT, vdwtFSWITCH, vdwtPSWITCH, vdwtEWALDGEOM, vdwtEWALDLB, vdwtNR
+};
+
+p_nbk_func_noener p_nbk_c_noener[coultNR][vdwtNR] =
+{
+#ifdef SW_TEST_FUNC /* in SwConfig.h */
+    { nbnxn_kernel_ElecRF_VdwLJ_F_ref,           NULL, NULL, NULL, NULL           },
+    { nbnxn_kernel_ElecQSTab_VdwLJ_F_ref,        NULL, NULL, NULL, NULL           },
+    { NULL, NULL, NULL, NULL, NULL  }
+#else
+    { nbnxn_kernel_ElecRF_VdwLJ_F_ref,           nbnxn_kernel_ElecRF_VdwLJFsw_F_ref,           nbnxn_kernel_ElecRF_VdwLJPsw_F_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombGeom_F_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombLB_F_ref           },
+    { nbnxn_kernel_ElecQSTab_VdwLJ_F_ref,        nbnxn_kernel_ElecQSTab_VdwLJFsw_F_ref,        nbnxn_kernel_ElecQSTab_VdwLJPsw_F_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombGeom_F_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombLB_F_ref        },
+    { nbnxn_kernel_ElecQSTabTwinCut_VdwLJ_F_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJFsw_F_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJPsw_F_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombGeom_F_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombLB_F_ref }
+#endif
+};
+
+p_nbk_func_ener p_nbk_c_ener[coultNR][vdwtNR] =
+{
+#ifdef SW_TEST_FUNC /* in SwConfig.h */
+    { nbnxn_kernel_ElecRF_VdwLJ_VF_ref,           NULL, NULL, NULL, NULL           },
+    { nbnxn_kernel_ElecQSTab_VdwLJ_VF_ref,        NULL, NULL, NULL, NULL           },
+    { NULL, NULL, NULL, NULL, NULL  }
+#else
+    { nbnxn_kernel_ElecRF_VdwLJ_VF_ref,           nbnxn_kernel_ElecRF_VdwLJFsw_VF_ref,           nbnxn_kernel_ElecRF_VdwLJPsw_VF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombGeom_VF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombLB_VF_ref            },
+    { nbnxn_kernel_ElecQSTab_VdwLJ_VF_ref,        nbnxn_kernel_ElecQSTab_VdwLJFsw_VF_ref,        nbnxn_kernel_ElecQSTab_VdwLJPsw_VF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombGeom_VF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombLB_VF_ref         },
+    { nbnxn_kernel_ElecQSTabTwinCut_VdwLJ_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJFsw_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJPsw_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombGeom_VF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombLB_VF_ref  }
+#endif
+};
+#ifdef SW_ENERGRP /* in SwConfig */
+
+p_nbk_func_ener p_nbk_c_energrp[coultNR][vdwtNR] =
+{
+#ifdef SW_TEST_FUNC /* in SwConfig.h */
+    { nbnxn_kernel_ElecRF_VdwLJ_VgrpF_ref,           NULL, NULL, NULL, NULL           },
+    { nbnxn_kernel_ElecQSTab_VdwLJ_VgrpF_ref,        NULL, NULL, NULL, NULL           },
+    { NULL, NULL, NULL, NULL, NULL  }
+#else
+    { nbnxn_kernel_ElecRF_VdwLJ_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJFsw_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJPsw_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombGeom_VgrpF_ref,           nbnxn_kernel_ElecRF_VdwLJEwCombLB_VgrpF_ref           },
+    { nbnxn_kernel_ElecQSTab_VdwLJ_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJFsw_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJPsw_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombGeom_VgrpF_ref,        nbnxn_kernel_ElecQSTab_VdwLJEwCombLB_VgrpF_ref        },
+    { nbnxn_kernel_ElecQSTabTwinCut_VdwLJ_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJFsw_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJPsw_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombGeom_VgrpF_ref, nbnxn_kernel_ElecQSTabTwinCut_VdwLJEwCombLB_VgrpF_ref }
+#endif
+};
+
 #endif
 
 void
@@ -217,8 +256,6 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
     int                vdwt;
     int                nb;
     int                nthreads gmx_unused;
-
-    func_para_t host_func_para;
 
     nnbl = nbl_list->nnbl;
     nbl  = nbl_list->nbl;
@@ -330,11 +367,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             wait_device();
 
             /* Don't calculate energies */
-            p_nbk_c_noener[coult][vdwt](nbl[nb], nbat,
-                                        ic,
-                                        shift_vec,
-                                        out->f,
-                                        fshift_p);
+            fake_device_run();
+            p_nbk_c_noener[coult][vdwt]();
 
         }
         else if (out->nV == 1)
@@ -365,13 +399,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             notice_device();
             wait_device();
 
-            p_nbk_c_ener[coult][vdwt](nbl[nb], nbat,
-                                      ic,
-                                      shift_vec,
-                                      out->f,
-                                      fshift_p,
-                                      out->Vvdw,
-                                      out->Vc);
+            fake_device_run();
+            p_nbk_c_ener[coult][vdwt]();
         }
         else
         {
@@ -408,14 +437,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
 #endif
             notice_device();
             wait_device();
+            fake_device_run();
 #ifdef SW_ENERGRP /* in SwConfig */
-            p_nbk_c_energrp[coult][vdwt](nbl[nb], nbat,
-                                         ic,
-                                         shift_vec,
-                                         out->f,
-                                         fshift_p,
-                                         out->Vvdw,
-                                         out->Vc);
+            p_nbk_c_energrp[coult][vdwt]();
 #else
             static int grp_call=0;
             if(grp_call == 0)
