@@ -129,6 +129,7 @@ void subcore_func()
 	aget_mem(&nbl, workLoadPara.nbl, sizeof(nbnxn_pairlist_t));
 	aget_mem(&nbat, workLoadPara.nbat, sizeof(nbnxn_atomdata_t));
 	aget_mem(&ic, workLoadPara.ic, sizeof(interaction_const_t));
+	aget_mem(f_local, f+f_start, (f_end-f_start)*sizeof(real));
 
 	#ifndef HOST_RUN
 		wait_all_async_get();
@@ -366,7 +367,7 @@ void subcore_func()
 		{
 			for (d = 0; d < DIM; d++)
 			{
-				f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
+				f_local[(ci*UNROLLI+i)*F_STRIDE+d-f_start] += fi[i*FI_STRIDE+d];
 			}
 		}
 		// #ifdef CALC_SHIFTFORCES
@@ -391,4 +392,5 @@ void subcore_func()
 		}
 		} // end of ci write test
 	}
+	put_mem(f+f_start, f_local, (f_end-f_start)*sizeof(real));
 }
