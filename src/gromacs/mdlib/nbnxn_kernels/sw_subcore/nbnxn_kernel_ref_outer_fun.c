@@ -30,6 +30,7 @@ real					 	*f; // 会被更改的量，有规约！
 #define F_LOCAL_SIZE		5000
 real						f_local[F_LOCAL_SIZE];
 real					 	*fshift; // 会被更改的量，有规约！
+real						fshift_local[SHIFTS*DIM];
 real					 	*Vvdw; // 会被更改的量，有规约！
 real					 	*Vc; // 会被更改的量，有规约！
 
@@ -130,6 +131,8 @@ void subcore_func()
 	aget_mem(&nbat, workLoadPara.nbat, sizeof(nbnxn_atomdata_t));
 	aget_mem(&ic, workLoadPara.ic, sizeof(interaction_const_t));
 	aget_mem(f_local, f+f_start, (f_end-f_start)*sizeof(real));
+
+	memset(fshift_local, 0, sizeof(fshift_local));
 
 	#ifndef HOST_RUN
 		wait_all_async_get();
@@ -378,7 +381,7 @@ void subcore_func()
 			{
 				for (d = 0; d < DIM; d++)
 				{
-					fshift[ishf+d] += fi[i*FI_STRIDE+d];
+					fshift_local[ishf+d] += fi[i*FI_STRIDE+d];
 				}
 			}
 		}
@@ -393,4 +396,5 @@ void subcore_func()
 		} // end of ci write test
 	}
 	put_mem(f+f_start, f_local, (f_end-f_start)*sizeof(real));
+	put_mem(workLoadPara.fshift_host + device_core_id*SHIFTS*DIM, fshift_local, sizeof(fshift_local));
 }

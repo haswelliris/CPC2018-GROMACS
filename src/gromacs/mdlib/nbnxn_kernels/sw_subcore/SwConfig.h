@@ -44,6 +44,7 @@ struct WorkLoadPara {
     rvec                        *shift_vec;
     real                        *f;
     real                        *fshift;
+    real                        *fshift_host;
     real                        *Vvdw;
     real                        *Vc;
 };

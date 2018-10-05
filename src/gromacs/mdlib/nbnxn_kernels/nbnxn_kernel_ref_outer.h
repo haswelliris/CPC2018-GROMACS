@@ -144,6 +144,8 @@ NBK_FUNC_NAME(_VgrpF)
     #endif
 
     #define macro_has(para_name) ((macro_para >> para_name) & 1)
+
+    real fshift_host[64*SHIFTS*DIM];
     
     struct WorkLoadPara workLoadPara;
     workLoadPara.macro_para = macro_para;
@@ -153,6 +155,7 @@ NBK_FUNC_NAME(_VgrpF)
     workLoadPara.shift_vec  = shift_vec;
     workLoadPara.f          = f;
     workLoadPara.fshift     = fshift;
+    workLoadPara.fshift_host= fshift_host;
     workLoadPara.Vvdw       = Vvdw;
     workLoadPara.Vc         = Vc;
 
@@ -165,7 +168,13 @@ NBK_FUNC_NAME(_VgrpF)
     // host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara;
     // host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
     // notice_device()；
-    
+
+    int my_i;
+    for (device_core_id = 0; device_core_id < 64-1; device_core_id++)
+        for (my_i = 0; my_i < SHIFTS*DIM; my_i++)
+            fshift_host[(device_core_id+1)*SHIFTS*DIM+my_i] += fshift_host[device_core_id*SHIFTS*DIM+my_i];
+    for (my_i = 0; my_i < SHIFTS*DIM; my_i++)
+        fshift[my_i] = fshift_host[63*SHIFTS*DIM+my_i];
 
 #ifdef COUNT_PAIRS
     printf("atom pairs %d\n", npair);
