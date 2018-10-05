@@ -91,7 +91,7 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
 #undef NBK_FUNC_NAME
 #undef NBK_FUNC_NAME2
-()
+(int device_core_id)
 {
     // =========== DEF DATA =============
     const nbnxn_ci_t   *nbln;
@@ -210,10 +210,10 @@ NBK_FUNC_NAME(_VgrpF)
 
     // =========== DATA'S STAT =========== */
 
-    //int start_nci = BLOCK_HEAD(device_core_id, 64, host_func_para.nbl->nci);
-    //int end_nci = start_nci + BLOCK_SIZE(device_core_id, 64, host_func_para.nbl->nci);
+    int start_nci = BLOCK_HEAD(device_core_id, 64, host_func_para.nbl->nci);
+    int end_nci = start_nci + BLOCK_SIZE(device_core_id, 64, host_func_para.nbl->nci);
 
-    for (n = 0; n < host_func_para.nbl->nci; n++)
+    for (n = start_nci; n < end_nci; n++)
     {
         int i, d;
 

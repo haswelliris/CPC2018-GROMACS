@@ -62,9 +62,9 @@ extern "C" {
 /*! \brief Typedefs for declaring lookup tables of kernel functions.
  */
 
-typedef void (*p_nbk_func_noener)();
+typedef void (*p_nbk_func_noener)(int device_core_id);
 
-typedef void (*p_nbk_func_ener)();
+typedef void (*p_nbk_func_ener)(int device_core_id);
 
 #ifdef __cplusplus
 extern "C" {
@@ -239,6 +239,33 @@ p_nbk_func_ener p_nbk_c_energrp[coultNR][vdwtNR] =
 
 #endif
 
+void fake_device_run()
+{
+    int func_type = host_out_param[FUNC_TYPE];
+    int func_i    = host_out_param[FUNC_I];
+    int func_j    = host_out_param[FUNC_J];
+    int k;
+
+    if(func_type == FUNC_NO_ENER)
+    {
+        for(k = 0; k < 64; ++k)
+        {
+            p_nbk_c_noener[func_i][func_j](k);
+        }
+    }
+    else if(func_type == FUNC_ENER)
+    {
+        for(k = 0; k < 64; ++k)
+        {
+            p_nbk_c_ener[func_i][func_j](k);
+        }
+    }
+    else
+    {
+        gmx_incons("Unknown FUNCTYPE");
+    }
+}
+
 void
 nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                  const nbnxn_atomdata_t     *nbat,
@@ -368,7 +395,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
 
             /* Don't calculate energies */
             fake_device_run();
-            p_nbk_c_noener[coult][vdwt]();
+            //p_nbk_c_noener[coult][vdwt]();
 
         }
         else if (out->nV == 1)
@@ -400,7 +427,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             wait_device();
 
             fake_device_run();
-            p_nbk_c_ener[coult][vdwt]();
+            //p_nbk_c_ener[coult][vdwt]();
         }
         else
         {
@@ -437,9 +464,10 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
 #endif
             notice_device();
             wait_device();
+
             fake_device_run();
 #ifdef SW_ENERGRP /* in SwConfig */
-            p_nbk_c_energrp[coult][vdwt]();
+            //p_nbk_c_energrp[coult][vdwt]();
 #else
             static int grp_call=0;
             if(grp_call == 0)
