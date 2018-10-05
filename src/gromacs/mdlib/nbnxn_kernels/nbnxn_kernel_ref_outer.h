@@ -170,68 +170,102 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
     // =========== DEF DATA =============
 
-    for (n = 0; n < para_nbl->nci; n++)
-    {
-        // =========== INIT DATA =============
+    // =========== INIT DATA =============
 #ifdef LJ_POT_SWITCH
-        swV3 = para_ic->vdw_switch.c3;
-        swV4 = para_ic->vdw_switch.c4;
-        swV5 = para_ic->vdw_switch.c5;
-        swF2 = 3*para_ic->vdw_switch.c3;
-        swF3 = 4*para_ic->vdw_switch.c4;
-        swF4 = 5*para_ic->vdw_switch.c5;
+    swV3 = para_ic->vdw_switch.c3;
+    swV4 = para_ic->vdw_switch.c4;
+    swV5 = para_ic->vdw_switch.c5;
+    swF2 = 3*para_ic->vdw_switch.c3;
+    swF3 = 4*para_ic->vdw_switch.c4;
+    swF4 = 5*para_ic->vdw_switch.c5;
 #endif
 
 #ifdef LJ_EWALD
-        lje_coeff2   = para_ic->ewaldcoeff_lj*para_ic->ewaldcoeff_lj;
-        lje_coeff6_6 = lje_coeff2*lje_coeff2*lje_coeff2/6.0;
-        lje_vc       = para_ic->sh_lj_ewald;
+    lje_coeff2   = para_ic->ewaldcoeff_lj*para_ic->ewaldcoeff_lj;
+    lje_coeff6_6 = lje_coeff2*lje_coeff2*lje_coeff2/6.0;
+    lje_vc       = para_ic->sh_lj_ewald;
 
-        ljc          = para_nbat->nbfp_comb;
+    ljc          = para_nbat->nbfp_comb;
 #endif
 
 #ifdef CALC_COUL_RF
-        k_rf2 = 2*para_ic->k_rf;
+    k_rf2 = 2*para_ic->k_rf;
 #ifdef CALC_ENERGIES
-        k_rf = para_ic->k_rf;
-        c_rf = para_ic->c_rf;
+    k_rf = para_ic->k_rf;
+    c_rf = para_ic->c_rf;
 #endif
 #endif
 #ifdef CALC_COUL_TAB
-        tabscale = para_ic->tabq_scale;
+    tabscale = para_ic->tabq_scale;
 #ifdef CALC_ENERGIES
-        halfsp = 0.5/para_ic->tabq_scale;
+    halfsp = 0.5/para_ic->tabq_scale;
 #endif
 
 #ifndef GMX_DOUBLE
-        tab_coul_FDV0 = para_ic->tabq_coul_FDV0;
+    tab_coul_FDV0 = para_ic->tabq_coul_FDV0;
 #else
-        tab_coul_F    = para_ic->tabq_coul_F;
-        tab_coul_V    = para_ic->tabq_coul_V;
+    tab_coul_F    = para_ic->tabq_coul_F;
+    tab_coul_V    = para_ic->tabq_coul_V;
 #endif
 #endif
 
 #ifdef ENERGY_GROUPS
-        egp_mask = (1<<para_nbat->neg_2log) - 1;
+    egp_mask = (1<<para_nbat->neg_2log) - 1;
 #endif
 
 
-        rcut2               = para_ic->rcoulomb*para_ic->rcoulomb;
+    rcut2               = para_ic->rcoulomb*para_ic->rcoulomb;
 #ifdef VDW_CUTOFF_CHECK
-        rvdw2               = para_ic->rvdw*para_ic->rvdw;
+    rvdw2               = para_ic->rvdw*para_ic->rvdw;
 #endif
 
-        ntype2              = para_nbat->ntype*2;
-        nbfp                = para_nbat->nbfp;
-        q                   = para_nbat->q;
-        type                = para_nbat->type;
-        facel               = para_ic->epsfac;
-        para_shiftvec            = para_shift_vec[0];
-        x                   = para_nbat->x;
+    ntype2              = para_nbat->ntype*2;
+    nbfp                = para_nbat->nbfp;
+    q                   = para_nbat->q;
+    type                = para_nbat->type;
+    facel               = para_ic->epsfac;
+    para_shiftvec            = para_shift_vec[0];
+    x                   = para_nbat->x;
 
-        l_cj = para_nbl->cj;
-        // =========== INIT DATA =============
+    l_cj = para_nbl->cj;
+    // =========== INIT DATA =============
 
+    /* =========== DATA'S STAT =========== //
+    int ci_SZ = para_nbl->nci;
+    int cj_SZ = para_nbl->ncj;
+    int i, j, k;
+
+    for(k = 0; k < 64; ++k)
+    {
+        if(k == host_param.host_rank)
+        {
+            printf("\n\n=====RANK %d=======\n", host_param.host_rank);
+            printf("ci_SZ =%d, cj_SZ =%d\n\n", ci_SZ, cj_SZ);
+            for(i = 0; i < ci_SZ; ++i)
+            {
+                nbln = &para_nbl->ci[i];
+                printf("ci[%d]'s info:\n", i);
+                printf("ci =%d, cjind0 =%d, cjind1 =%d\n", nbln->ci, nbln->cj_ind_start, nbln->cj_ind_end);
+                printf("cj list = [");
+                for(j = nbln->cj_ind_start; j < nbln->cj_ind_end; ++j)
+                {
+                    printf("%d, ", para_nbl->cj[j].cj);
+                }
+                printf("]\n\n");
+            }
+            printf("\n==================\n\n");
+        }
+        else
+        {
+            sleep(1);
+        }
+    }
+
+
+    // =========== DATA'S STAT =========== */
+
+    for (n = 0; n < para_nbl->nci; n++)
+    {
         int i, d;
 
         nbln = &para_nbl->ci[n];

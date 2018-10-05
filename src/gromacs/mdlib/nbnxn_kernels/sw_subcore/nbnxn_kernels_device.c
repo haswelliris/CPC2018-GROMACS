@@ -183,4 +183,16 @@ void device_run()
 #endif
     if(func_type > 1 || func_i > 1 || func_j > 0)
         OLOG("UNKNOWN FUNC: FuncType =%d, I =%d, J =%d\n", func_type, func_i, func_j);
+#define SW_PRINT_PARASIZE
+#undef SW_PRINT_PARASIZE
+#ifdef SW_PRINT_PARASIZE
+    {
+        int natoms = device_func_para.nbat->natoms;
+        int fstride = device_func_para.nbat->fstride;
+        int sizeof_f = natoms*fstride;
+        int sizeof_fshift = SHIFTS*DIM;
+        if(((device_notice_counter + device_param.host_rank - 1) % 64) == 0)
+            OLOG("natoms =%d, fstride =%d, sizeof_f =%d, sizeof_fshift =%d\n", natoms, fstride, sizeof_f, sizeof_fshift);
+    }
+#endif
 }

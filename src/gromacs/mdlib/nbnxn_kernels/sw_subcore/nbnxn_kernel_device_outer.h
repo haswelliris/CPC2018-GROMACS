@@ -105,7 +105,7 @@ NBK_FUNC_NAME(_VgrpF)
 
     int                 ntype2;
     real                facel;
-    real               *nbfp_i;
+    // real               *nbfp_i; // UNUSED
     int                 n, ci, ci_sh;
     int                 ish, ishf;
     gmx_bool            do_LJ, half_LJ, do_coul, do_self;
@@ -179,7 +179,7 @@ NBK_FUNC_NAME(_VgrpF)
     int start_nci = BLOCK_HEAD(device_core_id, 64, device_func_para.nbl->nci);
     int end_nci = start_nci + BLOCK_SIZE(device_core_id, 64, device_func_para.nbl->nci);
 
-    for (n = 0; n < device_func_para.nbl->nci; n++)
+    for (n = start_nci; n < end_nci; n++)
     {
         int i, d;
 
@@ -211,6 +211,7 @@ NBK_FUNC_NAME(_VgrpF)
         Vc_ci   = 0;
 #endif
 
+        //TODO: ldm load: x, q， func_para_shiftvec
         for (i = 0; i < UNROLLI; i++)
         {
             for (d = 0; d < DIM; d++)
@@ -242,6 +243,7 @@ NBK_FUNC_NAME(_VgrpF)
             {
                 for (i = 0; i < UNROLLI; i++)
                 {
+                    //TODO: REDUCE SUM
                     /* Coulomb self interaction */
                     device_func_para.Vc[0]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
                 }
@@ -302,6 +304,7 @@ NBK_FUNC_NAME(_VgrpF)
         {
             for (d = 0; d < DIM; d++)
             {
+                //TODO: REDUCE SUM
                 device_func_para.f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
             }
         }
@@ -313,6 +316,7 @@ NBK_FUNC_NAME(_VgrpF)
             {
                 for (d = 0; d < DIM; d++)
                 {
+                    //TODO: REDUCE SUM
                     device_func_para.fshift[ishf+d] += fi[i*FI_STRIDE+d];
                 }
             }
@@ -320,6 +324,7 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
 
 #ifdef CALC_ENERGIES
+        //TODO: REDUCE SUM
         *device_func_para.Vvdw += Vvdw_ci;
         *device_func_para.Vc   += Vc_ci;
 #endif

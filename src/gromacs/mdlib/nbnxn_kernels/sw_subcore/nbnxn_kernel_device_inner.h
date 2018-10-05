@@ -44,6 +44,7 @@
     int cj;
     int i;
 
+    //TODO: ldm load: l_cj
     cj = l_cj[cjind].cj;
 
     for (i = 0; i < UNROLLI; i++)
@@ -54,6 +55,7 @@
 
         ai = ci*UNROLLI + i;
 
+        //TODO: ldm load: type
         type_i_off = type[ai]*ntype2;
 
         for (j = 0; j < UNROLLJ; j++)
@@ -138,6 +140,7 @@
             if (i < UNROLLI/2)
 #endif
             {
+                //TODO: ldm load: nbfp
                 c6      = nbfp[type_i_off+type[aj]*2  ];
                 c12     = nbfp[type_i_off+type[aj]*2+1];
 
@@ -211,6 +214,7 @@
             /* 7 flops for float 1/r-table force */
 #ifdef CALC_ENERGIES
 #ifndef GMX_DOUBLE
+            //TODO: ldm load: tab_coul_FDV0, tab_coul_V, tab_coul_F
             vcoul  = qq*(interact*(rinv - device_func_para.ic->sh_ewald)
                          -(tab_coul_FDV0[ri*4+2]
                            -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
@@ -256,6 +260,7 @@
             fi[i*FI_STRIDE+YY] += fy;
             fi[i*FI_STRIDE+ZZ] += fz;
             /* Decrement j-atom force */
+            //TODO: REDUCE SUM
             device_func_para.f[aj*F_STRIDE+XX]  -= fx;
             device_func_para.f[aj*F_STRIDE+YY]  -= fy;
             device_func_para.f[aj*F_STRIDE+ZZ]  -= fz;
