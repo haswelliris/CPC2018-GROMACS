@@ -377,9 +377,17 @@ else {
             fz = fscal*dz;
 
             /* Increment i-atom force */
-            fi[i*FI_STRIDE+XX] += fx;
-            fi[i*FI_STRIDE+YY] += fy;
-            fi[i*FI_STRIDE+ZZ] += fz;
+            // fi[i*FI_STRIDE+XX] += fx;
+            // fi[i*FI_STRIDE+YY] += fy;
+            // fi[i*FI_STRIDE+ZZ] += fz;
+            f[(ci*UNROLLI+i)*F_STRIDE+XX] += fx;
+            f[(ci*UNROLLI+i)*F_STRIDE+YY] += fy;
+            f[(ci*UNROLLI+i)*F_STRIDE+ZZ] += fz;
+            if (fshift != NULL) {
+                fshift[ishf+XX] += fx;
+                fshift[ishf+YY] += fy;
+                fshift[ishf+ZZ] += fz;
+            }
             /* Decrement j-atom force */
             f[aj*F_STRIDE+XX]  -= fx;
             f[aj*F_STRIDE+YY]  -= fy;
