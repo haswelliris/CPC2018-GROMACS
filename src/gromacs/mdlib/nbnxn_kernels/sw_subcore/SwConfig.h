@@ -46,7 +46,9 @@ struct WorkLoadPara {
     real                        *fshift;
     real                        *fshift_host;
     real                        *Vvdw;
+    real                        *Vvdw_host;
     real                        *Vc;
+    real                        *Vc_host;
 };
 
 // ---- CUSTOM CONFIG

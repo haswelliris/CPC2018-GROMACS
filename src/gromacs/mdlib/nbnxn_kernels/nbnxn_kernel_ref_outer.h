@@ -146,6 +146,8 @@ NBK_FUNC_NAME(_VgrpF)
     #define macro_has(para_name) ((macro_para >> para_name) & 1)
 
     real fshift_host[64*SHIFTS*DIM];
+    real Vvdw_host[64];
+    real Vc_host[64];
     
     struct WorkLoadPara workLoadPara;
     workLoadPara.macro_para = macro_para;
@@ -157,7 +159,9 @@ NBK_FUNC_NAME(_VgrpF)
     workLoadPara.fshift     = fshift;
     workLoadPara.fshift_host= fshift_host;
     workLoadPara.Vvdw       = Vvdw;
+    workLoadPara.Vvdw_host  = Vvdw_host;
     workLoadPara.Vc         = Vc;
+    workLoadPara.Vc_host    = Vc_host;
 
     // fake subcore
     int device_core_id;
@@ -175,6 +179,13 @@ NBK_FUNC_NAME(_VgrpF)
             fshift_host[(device_core_id+1)*SHIFTS*DIM+my_i] += fshift_host[device_core_id*SHIFTS*DIM+my_i];
     for (my_i = 0; my_i < SHIFTS*DIM; my_i++)
         fshift[my_i] = fshift_host[63*SHIFTS*DIM+my_i];
+
+    if (macro_has(para_CALC_ENERGIES)) {
+        for (device_core_id = 0; device_core_id < 64; device_core_id++) {
+            *Vvdw += Vvdw_host[device_core_id];
+            *Vc += Vc_host[device_core_id];
+        }
+    }
 
 #ifdef COUNT_PAIRS
     printf("atom pairs %d\n", npair);

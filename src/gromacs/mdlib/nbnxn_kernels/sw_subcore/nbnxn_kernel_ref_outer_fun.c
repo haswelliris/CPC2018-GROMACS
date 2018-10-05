@@ -32,7 +32,9 @@ real						f_local[F_LOCAL_SIZE];
 real					 	*fshift; // 会被更改的量，有规约！
 real						fshift_local[SHIFTS*DIM];
 real					 	*Vvdw; // 会被更改的量，有规约！
+real						Vvdw_local;
 real					 	*Vc; // 会被更改的量，有规约！
+real						Vc_local;
 
 nbnxn_ci_t 					nbln; // 每次迭代值开始初始化，只在从核使用，使用其对象成员
 nbnxn_cj_t 					l_cj; // 局部变量，初始化后在循环内不变，使用数组内容
@@ -133,6 +135,8 @@ void subcore_func()
 	aget_mem(f_local, f+f_start, (f_end-f_start)*sizeof(real));
 
 	memset(fshift_local, 0, sizeof(fshift_local));
+	Vvdw_local = 0;
+	Vc_local = 0;
 
 	#ifndef HOST_RUN
 		wait_all_async_get();
@@ -389,12 +393,16 @@ void subcore_func()
 
 		if (macro_has(para_CALC_ENERGIES)) {
 			if (!macro_has(para_ENERGY_GROUPS)) {
-				*Vvdw += Vvdw_ci;
-				*Vc   += Vc_ci;
+				// *Vvdw += Vvdw_ci;
+				// *Vc   += Vc_ci;
+				Vvdw_local += Vvdw_ci;
+				Vc_local += Vc_ci;
 			}
 		}
 		} // end of ci write test
 	}
 	put_mem(f+f_start, f_local, (f_end-f_start)*sizeof(real));
 	put_mem(workLoadPara.fshift_host + device_core_id*SHIFTS*DIM, fshift_local, sizeof(fshift_local));
+	put_mem(workLoadPara.Vvdw_host+device_core_id, &Vvdw_local, sizeof(real));
+	put_mem(workLoadPara.Vc_host+device_core_id, &Vc_local, sizeof(real));
 }
