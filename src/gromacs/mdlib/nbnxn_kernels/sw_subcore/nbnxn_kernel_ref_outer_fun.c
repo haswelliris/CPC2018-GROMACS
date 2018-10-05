@@ -21,10 +21,10 @@ nbnxn_pairlist_t			nbl; // 会用到这个结构体里少量值
 nbnxn_atomdata_t			nbat; // 会用到这个结构体里比较多的东西
 interaction_const_t			ic; // 用于大量初始化，inner中也有很多使用
 rvec					 	*shift_vec; // 不需要传入，已提取到shiftvec
-real					 	*f; // 会被更改的量，有规约！
-real					 	*fshift; // 会被更改的量，有规约！
-real					 	*Vvdw; // 会被更改的量，有规约！
-real					 	*Vc; // 会被更改的量，有规约！
+real					 	*f; // 会被更改的量，有规约！大小为20000左右
+real					 	*fshift; // 会被更改的量，有规约！大小为66左右
+real					 	*Vvdw; // 会被更改的量，有规约！每次都是对下标0操作，奇怪下标那里不会被访问到
+real					 	*Vc; // 会被更改的量，有规约！每次都是对下标0操作，奇怪下标那里不会被访问到
 
 nbnxn_ci_t 					nbln; // 每次迭代值开始初始化，只在从核使用，使用其对象成员
 nbnxn_cj_t 					l_cj; // 局部变量，初始化后在循环内不变，使用数组内容
@@ -132,22 +132,22 @@ void subcore_func()
 
 	// init
 
-	if (macro_has(para_LJ_POT_SWITCH)) {
-	    swV3 = ic.vdw_switch.c3;
-	    swV4 = ic.vdw_switch.c4;
-	    swV5 = ic.vdw_switch.c5;
-	    swF2 = 3*ic.vdw_switch.c3;
-	    swF3 = 4*ic.vdw_switch.c4;
-	    swF4 = 5*ic.vdw_switch.c5;
-	}
+	// if (macro_has(para_LJ_POT_SWITCH)) {
+	//     swV3 = ic.vdw_switch.c3;
+	//     swV4 = ic.vdw_switch.c4;
+	//     swV5 = ic.vdw_switch.c5;
+	//     swF2 = 3*ic.vdw_switch.c3;
+	//     swF3 = 4*ic.vdw_switch.c4;
+	//     swF4 = 5*ic.vdw_switch.c5;
+	// }
 
-	if (macro_has(para_LJ_EWALD)) {
-	    lje_coeff2   = ic.ewaldcoeff_lj*ic.ewaldcoeff_lj;
-	    lje_coeff6_6 = lje_coeff2*lje_coeff2*lje_coeff2/6.0;
-	    lje_vc       = ic.sh_lj_ewald;
+	// if (macro_has(para_LJ_EWALD)) {
+	//     lje_coeff2   = ic.ewaldcoeff_lj*ic.ewaldcoeff_lj;
+	//     lje_coeff6_6 = lje_coeff2*lje_coeff2*lje_coeff2/6.0;
+	//     lje_vc       = ic.sh_lj_ewald;
 
-	    ljc          = nbat.nbfp_comb;
-	}
+	//     ljc          = nbat.nbfp_comb;
+	// }
 
 	if (macro_has(para_CALC_COUL_RF)) {
 	    k_rf2 = 2*ic.k_rf;
@@ -172,15 +172,15 @@ void subcore_func()
 		#endif
 	}
 
-	if (macro_has(para_ENERGY_GROUPS)) {
-    	egp_mask = (1<<nbat.neg_2log) - 1;
-	}
+	// if (macro_has(para_ENERGY_GROUPS)) {
+ //    	egp_mask = (1<<nbat.neg_2log) - 1;
+	// }
 
     rcut2               = ic.rcoulomb*ic.rcoulomb;
 
-    if (macro_has(para_VDW_CUTOFF_CHECK)) {
-    	rvdw2           = ic.rvdw*ic.rvdw;
-	}
+ //    if (macro_has(para_VDW_CUTOFF_CHECK)) {
+ //    	rvdw2           = ic.rvdw*ic.rvdw;
+	// }
 
 
     ntype2              = nbat.ntype*2;
@@ -227,23 +227,23 @@ void subcore_func()
 		do_coul = (nbln.shift & NBNXN_CI_DO_COUL(0));
 		half_LJ = ((nbln.shift & NBNXN_CI_HALF_LJ(0)) || !do_LJ) && do_coul;
 
-		if (macro_has(para_LJ_EWALD))
-			do_self = TRUE;
-		else 
+		// if (macro_has(para_LJ_EWALD))
+		// 	do_self = TRUE;
+		// else 
 			do_self = do_coul;
 
 
 		if (macro_has(para_CALC_ENERGIES)) {
-			if (!macro_has(para_ENERGY_GROUPS)) {
+			// if (!macro_has(para_ENERGY_GROUPS)) {
 				Vvdw_ci = 0;
 				Vc_ci   = 0;
-			}
-			else {
-				for (i = 0; i < UNROLLI; i++)
-				{
-					egp_sh_i[i] = ((nbat.energrp[ci]>>(i*nbat.neg_2log)) & egp_mask)*nbat.nenergrp;
-				}
-			}
+			// }
+			// else {
+			// 	for (i = 0; i < UNROLLI; i++)
+			// 	{
+			// 		egp_sh_i[i] = ((nbat.energrp[ci]>>(i*nbat.neg_2log)) & egp_mask)*nbat.nenergrp;
+			// 	}
+			// }
 		}
 
 		for (i = 0; i < UNROLLI; i++)
@@ -280,18 +280,18 @@ void subcore_func()
 					{
 						int egp_ind;
 
-						if (macro_has(para_ENERGY_GROUPS))
-							egp_ind = egp_sh_i[i] + ((nbat.energrp[ci]>>(i*nbat.neg_2log)) & egp_mask);
-						else
+						// if (macro_has(para_ENERGY_GROUPS))
+						// 	egp_ind = egp_sh_i[i] + ((nbat.energrp[ci]>>(i*nbat.neg_2log)) & egp_mask);
+						// else
 							egp_ind = 0;
 
 						/* Coulomb self interaction */
 						Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
 
-						if (macro_has(para_LJ_EWALD)) {
-							/* LJ Ewald self interaction */
-							Vvdw[egp_ind] += 0.5*nbat.nbfp[nbat.type[ci*UNROLLI+i]*(nbat.ntype + 1)*2]/6*lje_coeff6_6;
-						}
+						// if (macro_has(para_LJ_EWALD)) {
+						// 	/* LJ Ewald self interaction */
+						// 	Vvdw[egp_ind] += 0.5*nbat.nbfp[nbat.type[ci*UNROLLI+i]*(nbat.ntype + 1)*2]/6*lje_coeff6_6;
+						// }
 					}
 				}
 			}
@@ -370,11 +370,11 @@ void subcore_func()
 		}
 		// #endif
 
-		if (macro_has(para_CALC_ENERGIES)) {
-			if (!macro_has(para_ENERGY_GROUPS)) {
+		// if (macro_has(para_CALC_ENERGIES)) {
+		// 	if (!macro_has(para_ENERGY_GROUPS)) {
 				*Vvdw += Vvdw_ci;
 				*Vc   += Vc_ci;
-			}
-		}
+		// 	}
+		// }
 	}
 }
