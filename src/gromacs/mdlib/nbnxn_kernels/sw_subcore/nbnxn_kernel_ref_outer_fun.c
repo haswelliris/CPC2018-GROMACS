@@ -5,10 +5,15 @@
 	#include <string.h>
 	#define aget_mem(A, B, C) memcpy(A, B, C)
 	#define sget_mem(A, B, C) memcpy(A, B, C)
+	#define put_mem(A, B, C) memcpy(A, B, C)
+	#define alloc(A) malloc(A)
 #else
 	#include "SwDevice.h"
 	#define aget_mem(A, B, C) async_get(A, B, C)
 	#define sget_mem(A, B, C) sync_get(A, B, C)
+	#define put_mem(A, B, C) sync_put(A, B, C)
+	#define alloc(A) device_malloc(A)
+	#define free(A) ldm_free(A)
 #endif
 
 
@@ -22,6 +27,8 @@ nbnxn_atomdata_t			nbat; // 会用到这个结构体里比较多的东西
 interaction_const_t			ic; // 用于大量初始化，inner中也有很多使用
 rvec					 	*shift_vec; // 不需要传入，已提取到shiftvec
 real					 	*f; // 会被更改的量，有规约！
+#define F_LOCAL_SIZE		5000
+real						f_local[F_LOCAL_SIZE];
 real					 	*fshift; // 会被更改的量，有规约！
 real					 	*Vvdw; // 会被更改的量，有规约！
 real					 	*Vc; // 会被更改的量，有规约！
@@ -112,6 +119,11 @@ void subcore_func()
 	Vvdw = workLoadPara.Vvdw;
 	Vc = workLoadPara.Vc;
 
+	int f_start = BLOCK_HEAD(device_core_id, 64, nbat.natoms/4)*12;
+    int f_end = f_start + BLOCK_SIZE(device_core_id, 64, nbat.natoms/4)*12;
+    if (f_end - f_start > F_LOCAL_SIZE)
+    	printf("F_LOCAL_SIZE is not big enough!\n");
+
 	// load obj
 
 	aget_mem(&nbl, workLoadPara.nbl, sizeof(nbnxn_pairlist_t));
@@ -197,9 +209,9 @@ void subcore_func()
 
     // printf("%d\n", nbl.ncj);
 
-	// for (n = 0; n < nbl.nci; n++)
-	int task_num = BLOCK_SIZE(device_core_id, 64, nbl.nci);
-	for (n = BLOCK_HEAD(device_core_id, 64, nbl.nci); task_num; task_num--, n++)
+	for (n = 0; n < nbl.nci; n++)
+	// int task_num = BLOCK_SIZE(device_core_id, 64, nbl.nci);
+	// for (n = BLOCK_HEAD(device_core_id, 64, nbl.nci); task_num; task_num--, n++)
 	{
 		int i, d;
 
@@ -286,7 +298,8 @@ void subcore_func()
 							egp_ind = 0;
 
 						/* Coulomb self interaction */
-						Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+						if (BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end))
+							Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
 
 						if (macro_has(para_LJ_EWALD)) {
 							/* LJ Ewald self interaction */
@@ -347,7 +360,7 @@ void subcore_func()
 			}
 		}
 		// ninner += cjind1 - cjind0;
-
+		if (BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end)) {
 		/* Add accumulated i-forces to the force array */
 		for (i = 0; i < UNROLLI; i++)
 		{
@@ -376,5 +389,6 @@ void subcore_func()
 				*Vc   += Vc_ci;
 			}
 		}
+		} // end of ci write test
 	}
 }
