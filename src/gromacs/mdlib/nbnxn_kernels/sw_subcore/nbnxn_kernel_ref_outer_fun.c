@@ -195,11 +195,12 @@ void subcore_func()
 
 	// end init
 
-    // printf("%d\n", nbl.ncj);
+    int f_start = BLOCK_HEAD(device_core_id, 64, nbat.natoms*F_STRIDE);
+    int f_end = f_start + BLOCK_SIZE(device_core_id, 64, nbat.natoms*F_STRIDE);
 
-	// for (n = 0; n < nbl.nci; n++)
-	int task_num = BLOCK_SIZE(device_core_id, 64, nbl.nci);
-	for (n = BLOCK_HEAD(device_core_id, 64, nbl.nci); task_num; task_num--, n++)
+	for (n = 0; n < nbl.nci; n++)
+	// int task_num = BLOCK_SIZE(device_core_id, 64, nbl.nci);
+	// for (n = BLOCK_HEAD(device_core_id, 64, nbl.nci); task_num; task_num--, n++)
 	{
 		int i, d;
 
@@ -370,11 +371,11 @@ void subcore_func()
 		// }
 		// #endif
 
-		if (macro_has(para_CALC_ENERGIES)) {
-			if (!macro_has(para_ENERGY_GROUPS)) {
-				*Vvdw += Vvdw_ci;
-				*Vc   += Vc_ci;
-			}
-		}
+		// if (macro_has(para_CALC_ENERGIES)) {
+		// 	if (!macro_has(para_ENERGY_GROUPS)) {
+		// 		*Vvdw += Vvdw_ci;
+		// 		*Vc   += Vc_ci;
+		// 	}
+		// }
 	}
 }

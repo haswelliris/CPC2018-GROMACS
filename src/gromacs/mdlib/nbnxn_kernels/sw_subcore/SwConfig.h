@@ -54,6 +54,7 @@ struct WorkLoadPara {
 // 将N个任务分给ID_SZ个从核，根据从核ID返回每个从核的任务数量
 #define BLOCK_HEAD(ID, ID_SZ, N) (((N) / (ID_SZ)) * (ID) + (((N) % (ID_SZ) > (ID)) ? (ID) : (N) % (ID_SZ)))
 // 将N个任务分给ID_SZ个从核，根据从核ID返回第一个任务的编号
+#define BLOCK_HINT(INDEX, START, END) (((INDEX) >= (START)) && ((INDEX) < (END)))
 
 // ----
 
