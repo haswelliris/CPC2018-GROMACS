@@ -31,59 +31,48 @@ static inline real *xi_C(unsigned int gp_i)
 {
     int Coffset = M2_MOD(gp_i,XC_MSK);
     int Chead   = M2_DIV(gp_i,XC_LOG2);
+    int fetch_sz;
     if(Chead == Cxi.hd)
     {
-// #ifdef DEBUG_CACHE
-//         TLOG("KAAAA! Cache HIT: gp_i =%d, Chead =%d, Coffset =%d\n", gp_i, Chead, Coffset);
-// #endif
         return &Cxi.C[Coffset*XC_GP];
     }
-    else if((gp_i+XC_MSK+1) <= Sxi)
+    if((gp_i+XC_MSK+1) <= Sxi)
     {
-// #ifdef DEBUG_CACHE
-//         TLOG("KAAAA! Cache MISS AAA: gp_i =%d, Chead =%d, Coffset =%d\n", gp_i, Chead, Coffset);
-// #endif
-        Cxi.hd = Chead;
-        sync_get(&Cxi.C[0], Hxi+XC_SZ*Chead, XC_SZ*sizeof(real));
-        DEVICE_CODE_FENCE();
-        return &Cxi.C[Coffset*XC_GP];
+        fetch_sz = XC_SZ;
     }
     else
     {
-// #ifdef DEBUG_CACHE
-//         TLOG("KAAAA! Cache MISS BBB: gp_i =%d, Chead =%d, Coffset =%d\n", gp_i, Chead, Coffset);
-// #endif
-        Cxi.hd = Chead;
-        sync_get(&Cxi.C[0], Hxi+XC_SZ*Chead, (Sxi-gp_i)*12*sizeof(real));
-        DEVICE_CODE_FENCE();
-        return &Cxi.C[Coffset*XC_GP];
+        fetch_sz = (Sxi-gp_i)*12;
     }
+    sync_get(&Cxi.C[0], Hxi+XC_SZ*Chead, fetch_sz*sizeof(real));
+    DEVICE_CODE_FENCE();
+    return &Cxi.C[Coffset*XC_GP];
 }
 
 static inline real *xj_C(unsigned int gp_i)
 {
     int Coffset = M2_MOD(gp_i,XC_MSK);
     int Chead   = M2_DIV(gp_i,XC_LOG2);
+    int fetch_sz;
     if(Chead == Cxj.hd)
     {
         return &Cxj.C[Coffset*XC_GP];
     }
     else if((gp_i+XC_MSK+1) <= Sxj)
     {
-        Cxj.hd = Chead;
-        sync_get(&Cxj.C[0], Hxj+XC_SZ*Chead, XC_SZ*sizeof(real));
-        DEVICE_CODE_FENCE();
-        return &Cxj.C[Coffset*XC_GP];
+        fetch_sz = XC_SZ;
     }
     else
     {
-        Cxj.hd = Chead;
-        sync_get(&Cxj.C[0], Hxj+XC_SZ*Chead, (Sxj-gp_i)*12*sizeof(real));
-        DEVICE_CODE_FENCE();
-        return &Cxj.C[Coffset*XC_GP];
+        fetch_sz = (Sxj-gp_i)*12;   
     }
+    Cxj.hd = Chead;
+    sync_get(&Cxj.C[0], Hxj+XC_SZ*Chead, fetch_sz*sizeof(real));
+    DEVICE_CODE_FENCE();
+    return &Cxj.C[Coffset*XC_GP];
 }
 
+#define QT_GP   (4)
 #ifndef GMX_DOUBLE
 #define QT_SZ   (256) //(64*4)
 #define QT_MSK  (63)
@@ -129,6 +118,7 @@ static inline real *tj_C(int idx)
 
 }
 
+#define CI_GP   (1)
 #define CI_SZ   (64)
 #define CI_MSK  (63)
 #define CI_LOG2 (6)
@@ -144,6 +134,7 @@ static inline _ci_cache_t *ci_C(int idx)
 
 }
 
+#define CJ_GP   (1)
 #define CJ_SZ   (128)
 #define CJ_MSK  (127)
 #define CJ_LOG2 (7)
@@ -159,6 +150,7 @@ static inline _cj_cache_t *cj_C(int idx)
 
 }
 
+#define NF_GP   (2)
 #ifndef GMX_DOUBLE
 #define NF_SZ   (256) //(128*2)
 #define NF_MSK  (127)
