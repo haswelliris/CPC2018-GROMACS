@@ -29,9 +29,11 @@ void device_run() {
 	if (device_core_id == 0) {
 		printf("----------0-----------\n");
 		printf("address work %ld  mod32 %ld\n",(long)&workLoadPara,((long)&workLoadPara)%32);
+		printf("%d\n",workLoadPara.macro_para);
 	}
 	        asm volatile ("nop":::"memory");
 	// asm volatile("halt");
 	// printf("workLoadPara=%ld\n", workLoadPara.macro_para);
-	subcore_func();
+	// subcore_func();
+	        asm volatile ("nop":::"memory");
 }
