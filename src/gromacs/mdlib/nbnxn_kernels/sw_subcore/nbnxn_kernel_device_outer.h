@@ -209,12 +209,27 @@ NBK_FUNC_NAME(_VgrpF)
     // ===== INIT CACHE ===== 
     real *Cxi_p;
     real *Cxj_p;
+    real *Cqi_p;
+    real *Cqj_p;
+    int  *Cti_p;
+    int  *Ctj_p;
     {
         clear_C();
         Hxi = x;
         Sxi = sizeof_f_div_12;
         Hxj = x;
         Sxj = sizeof_f_div_12;
+
+        // 暂时不管q的大小了
+        // Sqi = 
+        Hqi = q;
+        Hqj = q;
+
+        // t is type ?
+        Hti = type;
+        Htj = type;
+
+
     }
     // ===== INIT CACHE =====
 
@@ -315,6 +330,9 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
         //TODO: ldm load: x, q， func_para_shiftvec
         Cxi_p = xi_C(ci);
+        Cqi_p = qi_C(ci);
+        // type 上爆了。。。。
+        // Cti_p = ti_C(ci);
         for (i = 0; i < UNROLLI; i++)
         {
             for (d = 0; d < DIM; d++)
@@ -329,8 +347,14 @@ NBK_FUNC_NAME(_VgrpF)
                 xi[i*XI_STRIDE+d] = Cxi_p[i*X_STRIDE+d] + func_para_shiftvec[ishf+d];
                 fi[i*FI_STRIDE+d] = 0;
             }
-
-            qi[i] = facel*q[ci*UNROLLI+i];
+#ifdef DEBUG_CACHE
+            if(q[ci*UNROLLI+i] != Cqi_p[i])
+            {
+                TLOG("KAAAA! Cache ERR: ci =%d\n", ci);
+            }
+#endif
+            // qi[i] = facel*q[ci*UNROLLI+i];
+            qi[i] = facel*Cqi_p[i];
         }
         DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
@@ -359,7 +383,14 @@ NBK_FUNC_NAME(_VgrpF)
                 {
                     //TODO: REDUCE SUM
                     /* Coulomb self interaction */
-                    ldm_Vc   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+#ifdef DEBUG_CACHE
+                    if(q[ci*UNROLLI+i] != Cqi_p[i])
+                    {
+                        TLOG("KAAAA! Cache ERR: ci =%d\n", ci);
+                    }
+#endif
+                    // ldm_Vc   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+                    ldm_Vc   -= qi[i]*Cqi_p[i]*Vc_sub_self;
                 }
             }
         }
