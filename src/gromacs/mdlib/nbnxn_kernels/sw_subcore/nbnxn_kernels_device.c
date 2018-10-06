@@ -11,9 +11,9 @@ typedef struct {
     interaction_const_t  *ic;
     rvec                       *shift_vec;
     real                       *f;
-    real                       *fshift;
-    real                       *Vvdw;
-    real                       *Vc;
+    real                       *expand_Vvdw;
+    real                       *expand_Vc;
+    real                       *expand_fshift;
 } func_para_t;
 
 __thread_local func_para_t device_func_para;

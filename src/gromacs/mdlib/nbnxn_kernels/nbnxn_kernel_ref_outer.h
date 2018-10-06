@@ -210,6 +210,226 @@ NBK_FUNC_NAME(_VgrpF)
 
     // =========== DATA'S STAT =========== */
 
+#ifdef SW_NEW_ALG
+
+    int natoms = host_func_para.nbat->natoms;
+    int fstride = host_func_para.nbat->fstride;
+    int sizeof_f = natoms*fstride;
+    int sizeof_fshift = SHIFTS*DIM; // 135 * sizeof(float)
+
+    /* =========== DATA'S STAT =========== //
+    if(sizeof_f % 12 != 0)
+    {
+        OLOG("f cannot mod 12! sizeof_f =%d.", sizeof_f);
+    }
+    // =========== DATA'S STAT =========== */
+
+    int start_f_div_12 = BLOCK_HEAD(device_core_id, 64, sizeof_f/12);
+    int start_f = start_f_div_12*12;
+    int sz_f_div_12 = BLOCK_SIZE(device_core_id, 64, sizeof_f/12);
+    int sz_f = sz_f_div_12*12;
+    int end_f_div_12 = start_f_div_12 + sz_f_div_12;
+    int end_f = end_f_div_12*12;
+
+#ifdef CALC_SHIFTFORCES
+    real  ldm_fshift[SHIFTS*DIM];
+#endif
+    real* ldm_f;
+    real  ldm_Vvdw = 0;
+    real  ldm_Vc = 0;
+
+    ldm_f = (real*)malloc(sz_f*sizeof(real));
+
+#ifdef CALC_SHIFTFORCES
+    memset(ldm_fshift, 0, SHIFTS*DIM*sizeof(real));
+#endif
+    memcpy(ldm_f, host_func_para.f + start_f, sz_f*sizeof(real));
+
+#define IN_F_BLOCK(idx) ((idx) >= start_f_div_12 && (idx) < end_f_div_12)
+
+    for (n = 0; n < host_func_para.nbl->nci; n++)
+    {
+        int i, d, write_ci;
+
+        nbln = &host_func_para.nbl->ci[n];
+
+        ish              = (nbln->shift & NBNXN_CI_SHIFT);
+        /* x, host_func_para.f and host_func_para.fshift are assumed to be stored with stride 3 */
+        ishf             = ish*DIM;
+        cjind0           = nbln->cj_ind_start;
+        cjind1           = nbln->cj_ind_end;
+        /* Currently only works super-cells equal to sub-cells */
+        ci               = nbln->ci;
+        ci_sh            = (ish == CENTRAL ? ci : -1);
+        write_ci         = IN_F_BLOCK(ci);
+
+        /* We have 5 LJ/C combinations, but use only three inner loops,
+         * as the other combinations are unlikely and/or not much faster:
+         * inner half-LJ + C for half-LJ + C / no-LJ + C
+         * inner LJ + C      for full-LJ + C
+         * inner LJ          for full-LJ + no-C / half-LJ + no-C
+         */
+        do_LJ   = (nbln->shift & NBNXN_CI_DO_LJ(0));
+        do_coul = (nbln->shift & NBNXN_CI_DO_COUL(0));
+        half_LJ = ((nbln->shift & NBNXN_CI_HALF_LJ(0)) || !do_LJ) && do_coul;
+    
+        do_self = do_coul;
+
+#ifdef CALC_ENERGIES
+        Vvdw_ci = 0;
+        Vc_ci   = 0;
+#endif
+
+        //TODO: ldm load: x, q， func_para_shiftvec
+        for (i = 0; i < UNROLLI; i++)
+        {
+            for (d = 0; d < DIM; d++)
+            {
+                xi[i*XI_STRIDE+d] = x[(ci*UNROLLI+i)*X_STRIDE+d] + func_para_shiftvec[ishf+d];
+                fi[i*FI_STRIDE+d] = 0;
+            }
+
+            qi[i] = facel*q[ci*UNROLLI+i];
+        }
+#ifdef DENUG_F
+        TLOG("Miao 1.\n");
+#endif
+#ifdef CALC_ENERGIES
+        if (do_self && write_ci)
+        {
+            real Vc_sub_self;
+
+#ifdef CALC_COUL_RF
+            Vc_sub_self = 0.5*c_rf;
+#endif
+#ifdef CALC_COUL_TAB
+#ifdef GMX_DOUBLE
+            Vc_sub_self = 0.5*tab_coul_V[0];
+#else
+            Vc_sub_self = 0.5*tab_coul_FDV0[2];
+#endif
+#endif
+
+            if (l_cj[nbln->cj_ind_start].cj == ci_sh)
+            {
+                for (i = 0; i < UNROLLI; i++)
+                {
+                    //TODO: REDUCE SUM
+                    /* Coulomb self interaction */
+                    ldm_Vc   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+                }
+            }
+        }
+#endif  /* CALC_ENERGIES */
+#ifdef DENUG_F
+        TLOG("Miao 2.\n");
+#endif
+        cjind = cjind0;
+        while (cjind < cjind1 && host_func_para.nbl->cj[cjind].excl != 0xffff)
+        {
+#define CHECK_EXCLS
+            if (half_LJ)
+            {
+#define CALC_COULOMB
+#define HALF_LJ
+#include "nbnxn_kernel_ref_inner.h"
+#undef HALF_LJ
+#undef CALC_COULOMB
+            }
+            else if (do_coul)
+            {
+#define CALC_COULOMB
+#include "nbnxn_kernel_ref_inner.h"
+#undef CALC_COULOMB
+            }
+            else
+            {
+#include "nbnxn_kernel_ref_inner.h"
+            }
+#undef CHECK_EXCLS
+            cjind++;
+        }
+
+        for (; (cjind < cjind1); cjind++)
+        {
+            if (half_LJ)
+            {
+#define CALC_COULOMB
+#define HALF_LJ
+#include "nbnxn_kernel_ref_inner.h"
+#undef HALF_LJ
+#undef CALC_COULOMB
+            }
+            else if (do_coul)
+            {
+#define CALC_COULOMB
+#include "nbnxn_kernel_ref_inner.h"
+#undef CALC_COULOMB
+            }
+            else
+            {
+#include "nbnxn_kernel_ref_inner.h"
+            }
+        }
+#ifdef DENUG_F
+        TLOG("Miao 3.\n");
+#endif
+        if(write_ci)
+        {
+            /* Add accumulated i-forces to the force array */
+            for (i = 0; i < UNROLLI; i++)
+            {
+                for (d = 0; d < DIM; d++)
+                {
+                    //TODO: REDUCE SUM
+                    ldm_f[(ci*UNROLLI+i)*F_STRIDE+d-start_f] += fi[i*FI_STRIDE+d];
+                }
+            }
+#ifdef CALC_SHIFTFORCES
+            if (host_func_para.expand_fshift != NULL)
+            {
+                /* Add i forces to shifted force list */
+                for (i = 0; i < UNROLLI; i++)
+                {
+                    for (d = 0; d < DIM; d++)
+                    {
+                        //TODO: REDUCE SUM
+                        ldm_fshift[ishf+d] += fi[i*FI_STRIDE+d];
+                    }
+                }
+            }
+#endif
+#ifdef CALC_ENERGIES
+            //TODO: REDUCE SUM
+            ldm_Vvdw += Vvdw_ci;
+            ldm_Vc   += Vc_ci;
+#endif
+        }
+#ifdef DENUG_F
+        TLOG("Miao 4.\n");
+#endif
+    }
+
+    memcpy(host_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
+    free(ldm_f);
+#ifdef CALC_SHIFTFORCES
+    if (host_func_para.expand_fshift != NULL)
+    {
+        memcpy(host_func_para.expand_fshift+device_core_id*SHIFTS*DIM, ldm_fshift, SHIFTS*DIM*sizeof(real));
+    }
+#endif
+#ifdef CALC_ENERGIES
+    host_func_para.expand_Vvdw[device_core_id] = ldm_Vvdw;
+    host_func_para.expand_Vc  [device_core_id] = ldm_Vc;
+#endif
+#ifdef DENUG_F
+    TLOG("Miao 5.\n");
+#endif
+
+#undef IN_F_BLOCK
+
+#else  /* SW_NEW_ALG */
+
     int start_nci = BLOCK_HEAD(device_core_id, 64, host_func_para.nbl->nci);
     int end_nci = start_nci + BLOCK_SIZE(device_core_id, 64, host_func_para.nbl->nci);
 
@@ -284,7 +504,7 @@ NBK_FUNC_NAME(_VgrpF)
             }
         }
 #endif  /* CALC_ENERGIES */
-
+// ==============================================
         cjind = cjind0;
         while (cjind < cjind1 && host_func_para.nbl->cj[cjind].excl != 0xffff)
         {
@@ -332,7 +552,7 @@ NBK_FUNC_NAME(_VgrpF)
 #include "nbnxn_kernel_ref_inner.h"
             }
         }
-
+//===========================================
         /* Add accumulated i-forces to the force array */
         for (i = 0; i < UNROLLI; i++)
         {
@@ -356,13 +576,15 @@ NBK_FUNC_NAME(_VgrpF)
             }
         }
 #endif
-
+// ============================================
 #ifdef CALC_ENERGIES
         //TODO: REDUCE SUM
         *host_func_para.Vvdw += Vvdw_ci;
         *host_func_para.Vc   += Vc_ci;
 #endif
     }
+
+#endif  /* SW_NEW_ALG */
 }
 
 #undef CALC_SHIFTFORCES

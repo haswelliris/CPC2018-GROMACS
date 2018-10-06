@@ -752,8 +752,19 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
     /* and stop now if we should */
     bLastStep = (bRerunMD || (ir->nsteps >= 0 && step_rel > ir->nsteps) ||
                  ((multisim_nsteps >= 0) && (step_rel >= multisim_nsteps )));
+
+    //fgn : add this to decrease step
+    int fgn_step_count = 0;
+    char *fgn_step_size_str = getenv("GROMACS_STEP");
+    int fgn_step_size = 0;
+    if (fgn_step_size_str != NULL)
+        fgn_step_size = atoi(fgn_step_size_str);
+
     while (!bLastStep || (bRerunMD && bNotLastFrame))
     {
+        //fgn : control the step at here !
+        if (fgn_step_size!=0 && fgn_step_count == fgn_step_size) break;
+        else fgn_step_count++;
 
         /* Determine if this is a neighbor search step */
         bNStList = (ir->nstlist > 0  && step % ir->nstlist == 0);

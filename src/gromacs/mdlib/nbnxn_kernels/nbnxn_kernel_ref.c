@@ -40,6 +40,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 
 #include "gromacs/legacyheaders/force.h"
 #include "gromacs/legacyheaders/gmx_omp_nthreads.h"
@@ -76,9 +77,9 @@ typedef struct {
     interaction_const_t  *ic;
     rvec                       *shift_vec;
     real                       *f;
-    real                       *fshift;
-    real                       *Vvdw;
-    real                       *Vc;
+    real                       *expand_Vvdw;
+    real                       *expand_Vc;
+    real                       *expand_fshift;
 } func_para_t;
 
 func_para_t host_func_para;
@@ -368,6 +369,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
         }
 
+        real *expand_fshift = (real*)malloc(SHIFTS*DIM*64*sizeof(real));
 
         if (!(force_flags & GMX_FORCE_ENERGY))
         {
@@ -381,17 +383,17 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_func_para.ic = ic;
             host_func_para.shift_vec = shift_vec;
             host_func_para.f = out->f;
-            host_func_para.fshift = fshift_p;
-            host_func_para.Vvdw = NULL;
-            host_func_para.Vc = NULL;
+            host_func_para.expand_Vvdw = NULL;
+            host_func_para.expand_Vc = NULL;
+            host_func_para.expand_fshift = expand_fshift;
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
                 OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_NO_ENER, coult, vdwt);
             }
 #endif
-            notice_device();
-            wait_device();
+            //notice_device();
+            //wait_device();
 
             /* Don't calculate energies */
             fake_device_run();
@@ -404,6 +406,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             out->Vvdw[0] = 0;
             out->Vc[0]   = 0;
 
+            real *expand_Vvdw   = (real*)malloc(64*sizeof(real));
+            real *expand_Vc     = (real*)malloc(64*sizeof(real));
+
             host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
             host_out_param[FUNC_TYPE] = FUNC_ENER;
             host_out_param[FUNC_I] = coult;
@@ -414,20 +419,37 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_func_para.ic = ic;
             host_func_para.shift_vec = shift_vec;
             host_func_para.f = out->f;
-            host_func_para.fshift = fshift_p;
-            host_func_para.Vvdw = out->Vvdw;
-            host_func_para.Vc = out->Vc;
+            host_func_para.expand_Vvdw = expand_Vvdw;
+            host_func_para.expand_Vc = expand_Vc;
+            host_func_para.expand_fshift = expand_fshift;
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
                 OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_ENER, coult, vdwt);
             }
 #endif
-            notice_device();
-            wait_device();
+            //notice_device();
+            //wait_device();
 
             fake_device_run();
             //p_nbk_c_ener[coult][vdwt]();
+
+            // reduce Vvdw
+            int i;
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                expand_Vvdw[i+1] += expand_Vvdw[i];
+            }
+            out->Vvdw[0] = expand_Vvdw[63];
+            free(expand_Vvdw);
+
+            // reduce Vc
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                expand_Vc[i+1] += expand_Vc[i];
+            }
+            out->Vc[0] = expand_Vc[63];
+            free(expand_Vc);
         }
         else
         {
@@ -443,6 +465,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                 out->Vc[i] = 0;
             }
 
+            real *expand_Vvdw   = (real*)malloc(out->nV*64*sizeof(real));
+            real *expand_Vc     = (real*)malloc(out->nV*64*sizeof(real));
+
             host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
             host_out_param[FUNC_TYPE] = FUNC_ENERGRP;
             host_out_param[FUNC_I] = coult;
@@ -453,17 +478,17 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_func_para.ic = ic;
             host_func_para.shift_vec = shift_vec;
             host_func_para.f = out->f;
-            host_func_para.fshift = fshift_p;
-            host_func_para.Vvdw = out->Vvdw;
-            host_func_para.Vc = out->Vc;
+            host_func_para.expand_Vvdw = expand_Vvdw;
+            host_func_para.expand_Vc = expand_Vc;
+            host_func_para.expand_fshift = expand_fshift;
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
                 OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_ENERGRP, coult, vdwt);
             }
 #endif
-            notice_device();
-            wait_device();
+            //notice_device();
+            //wait_device();
 
             fake_device_run();
 #ifdef SW_ENERGRP /* in SwConfig */
@@ -477,7 +502,50 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
 
 #endif
+            // reduce Vvdw
+            int j;
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                for (j = 0; j < out->nV; j++)
+                {
+                    expand_Vvdw[(i+1)*out->nV+j] += expand_Vvdw[(i)*out->nV+j];
+                }
+            }
+            for (j = 0; j < out->nV; j++)
+            {
+                out->Vvdw[j] = expand_Vvdw[(63)*out->nV+j];
+            }
+            free(expand_Vvdw);
+
+            // reduce Vc
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                for (j = 0; j < out->nV; j++)
+                {
+                    expand_Vc[(i+1)*out->nV+j] += expand_Vc[(i)*out->nV+j];
+                }
+            }
+            for (j = 0; j < out->nV; j++)
+            {
+                out->Vc[j] = expand_Vc[(63)*out->nV+j];
+            }
+            free(expand_Vc);
         }
+
+        // reduce fshift
+        int i, j;
+        for(i = 0; i < 64 - 1; ++i)
+        {
+            for(j = 0; j < SHIFTS*DIM; ++j)
+            {
+                expand_fshift[(i+1)*SHIFTS*DIM+j] += expand_fshift[(i)*SHIFTS*DIM+j];
+            }
+        }
+        for(j = 0; j < SHIFTS*DIM; ++j)
+        {
+            fshift_p[j] += expand_fshift[63*SHIFTS*DIM+j];
+        }
+        free(expand_fshift);
     }
 
     if (force_flags & GMX_FORCE_ENERGY)

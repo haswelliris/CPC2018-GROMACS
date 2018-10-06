@@ -3,5 +3,6 @@
 
 #include "nbnxn_sw_config.h"
 #include <math.h>
+#include <string.h>
 
 #endif

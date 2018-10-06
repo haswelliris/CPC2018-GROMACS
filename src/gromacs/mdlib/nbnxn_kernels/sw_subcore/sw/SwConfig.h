@@ -45,6 +45,11 @@ struct InitParam
 #undef SW_ENERGRP
 
 #define SW_TEST_FUNC
+
+#define SW_NEW_ALG
+
+#define DENUG_F
+#undef DENUG_F
 // ----
 
 #endif

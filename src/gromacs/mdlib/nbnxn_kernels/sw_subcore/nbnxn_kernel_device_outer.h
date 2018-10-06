@@ -105,7 +105,7 @@ NBK_FUNC_NAME(_VgrpF)
 
     int                 ntype2;
     real                facel;
-    // real               *nbfp_i; // UNUSED
+    real               *nbfp_i; // UNUSED
     int                 n, ci, ci_sh;
     int                 ish, ishf;
     gmx_bool            do_LJ, half_LJ, do_coul, do_self;
@@ -186,7 +186,7 @@ NBK_FUNC_NAME(_VgrpF)
         nbln = &device_func_para.nbl->ci[n];
 
         ish              = (nbln->shift & NBNXN_CI_SHIFT);
-        /* x, device_func_para.f and device_func_para.fshift are assumed to be stored with stride 3 */
+        /* x, device_func_para.f and device_func_para.expand_fshift are assumed to be stored with stride 3 */
         ishf             = ish*DIM;
         cjind0           = nbln->cj_ind_start;
         cjind1           = nbln->cj_ind_end;
@@ -245,7 +245,7 @@ NBK_FUNC_NAME(_VgrpF)
                 {
                     //TODO: REDUCE SUM
                     /* Coulomb self interaction */
-                    device_func_para.Vc[0]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+                    device_func_para.expand_Vc[0]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
                 }
             }
         }
@@ -309,7 +309,7 @@ NBK_FUNC_NAME(_VgrpF)
             }
         }
 #ifdef CALC_SHIFTFORCES
-        if (device_func_para.fshift != NULL)
+        if (device_func_para.expand_fshift != NULL)
         {
             /* Add i forces to shifted force list */
             for (i = 0; i < UNROLLI; i++)
@@ -317,7 +317,7 @@ NBK_FUNC_NAME(_VgrpF)
                 for (d = 0; d < DIM; d++)
                 {
                     //TODO: REDUCE SUM
-                    device_func_para.fshift[ishf+d] += fi[i*FI_STRIDE+d];
+                    device_func_para.expand_fshift[ishf+d] += fi[i*FI_STRIDE+d];
                 }
             }
         }
@@ -325,8 +325,8 @@ NBK_FUNC_NAME(_VgrpF)
 
 #ifdef CALC_ENERGIES
         //TODO: REDUCE SUM
-        *device_func_para.Vvdw += Vvdw_ci;
-        *device_func_para.Vc   += Vc_ci;
+        *device_func_para.expand_Vvdw += Vvdw_ci;
+        *device_func_para.expand_Vc   += Vc_ci;
 #endif
     }
 }

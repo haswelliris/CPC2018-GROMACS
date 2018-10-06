@@ -43,9 +43,14 @@
 {
     int cj;
     int i;
+    int write_cj;
 
     //TODO: ldm load: l_cj
-    cj = l_cj[cjind].cj;
+    cj               = l_cj[cjind].cj;
+    write_cj         = IN_F_BLOCK(cj);
+
+    if(write_ci || write_cj)
+    {
 
     for (i = 0; i < UNROLLI; i++)
     {
@@ -256,16 +261,39 @@
             fz = fscal*dz;
 
             /* Increment i-atom force */
-            fi[i*FI_STRIDE+XX] += fx;
-            fi[i*FI_STRIDE+YY] += fy;
-            fi[i*FI_STRIDE+ZZ] += fz;
+#ifdef DENUG_F
+            TLOG("Miao 2.1.\n");
+#endif
+#ifdef SW_NEW_ALG
+            // if(write_ci) {
+#endif
+                fi[i*FI_STRIDE+XX] += fx;
+                fi[i*FI_STRIDE+YY] += fy;
+                fi[i*FI_STRIDE+ZZ] += fz;
+#ifdef SW_NEW_ALG
+            // }
+#endif
             /* Decrement j-atom force */
-            //TODO: REDUCE SUM
-            host_func_para.f[aj*F_STRIDE+XX]  -= fx;
-            host_func_para.f[aj*F_STRIDE+YY]  -= fy;
-            host_func_para.f[aj*F_STRIDE+ZZ]  -= fz;
-            /* 9 flops for force addition */
+#ifdef DENUG_F
+            TLOG("Miao 2.2. cj =%d, start_f =%d, end_f =%d, write =%d\n", cj, start_f_div_12, end_f_div_12, write_cj);
+#endif
+#ifdef SW_NEW_ALG
+            if(write_cj) {
+#endif
+                //TODO: REDUCE SUM
+                ldm_f[aj*F_STRIDE+XX-start_f]  -= fx;
+                ldm_f[aj*F_STRIDE+YY-start_f]  -= fy;
+                ldm_f[aj*F_STRIDE+ZZ-start_f]  -= fz;
+                /* 9 flops for force addition */
+#ifdef SW_NEW_ALG
+            }
+#endif
+#ifdef DENUG_F
+            TLOG("Miao 2.3.\n");
+#endif
         }
+    }
+    
     }
 }
 
