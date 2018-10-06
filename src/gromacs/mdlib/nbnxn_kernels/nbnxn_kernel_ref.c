@@ -430,8 +430,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         nbnxn_atomdata_t other_nbat;
         deep_copy_nbat(&other_nbat, nbat, 1, 0);
 
-        rvec *other_shift_vec = (rvec*)malloc(SHIFTS*DIM*64*sizeof(real));
-        memcpy(other_shift_vec, shift_vec, SHIFTS*DIM*64*sizeof(real));
+        rvec *other_shift_vec = (rvec*)malloc(SHIFTS*DIM*sizeof(real));
+        memcpy(other_shift_vec, shift_vec, SHIFTS*DIM*sizeof(real));
 
         real *other_tabq_coul_F = NULL;
         real *other_tabq_coul_V = NULL;
