@@ -149,14 +149,18 @@ NBK_FUNC_NAME(_VgrpF)
     real Vvdw_host[64];
     real Vc_host[64];
 
+    nbnxn_pairlist_t *nbl_host = deep_copy_nbl(nbl, 1);
+    nbnxn_atomdata_t *nbat_host = deep_copy_nbat(nbat, 1);
     real *f_host = (real*)malloc(nbat->natoms*F_STRIDE*sizeof(real));
     memcpy(f_host, f, nbat->natoms*F_STRIDE*sizeof(real));
-    
+    rvec *shift_vec_host = (rvec*)malloc(SHIFTS*DIM*sizeof(real));
+    memcpy(shift_vec_host, shift_vec, SHIFTS*DIM*sizeof(real));
+
     workLoadPara_host.macro_para = macro_para;
-    workLoadPara_host.nbl        = nbl;
-    workLoadPara_host.nbat       = nbat;
+    workLoadPara_host.nbl        = nbl_host;
+    workLoadPara_host.nbat       = nbat_host;
     workLoadPara_host.ic         = ic;
-    workLoadPara_host.shift_vec  = shift_vec;
+    workLoadPara_host.shift_vec  = shift_vec_host;
     workLoadPara_host.f          = f_host;
     workLoadPara_host.fshift     = fshift;
     workLoadPara_host.fshift_host= fshift_host;
@@ -194,6 +198,11 @@ NBK_FUNC_NAME(_VgrpF)
             *Vc += Vc_host[device_core_id];
         }
     }
+
+    free(f_host);
+    free(shift_vec_host);
+    deep_copy_nbl(nbl_host, 0);
+    deep_copy_nbat(nbat_host, 0);
 
 #ifdef COUNT_PAIRS
     printf("atom pairs %d\n", npair);

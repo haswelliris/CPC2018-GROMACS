@@ -55,6 +55,62 @@
 // extern void subcore_fun( struct WorkLoadPara *, int);
 struct WorkLoadPara workLoadPara_host;
 
+nbnxn_pairlist_t* deep_copy_nbl(nbnxn_pairlist_t *src, int new_or_delete)
+{
+    if(new_or_delete)
+    {
+        nbnxn_pairlist_t *dst;
+        dst = (nbnxn_pairlist_t*)malloc(sizeof(nbnxn_pairlist_t));
+        dst->ci = (nbnxn_ci_t*)malloc(src->nci*sizeof(nbnxn_ci_t));
+        dst->cj = (nbnxn_cj_t*)malloc(src->ncj*sizeof(nbnxn_cj_t));
+
+        dst->nci = src->nci;
+        dst->ncj = src->ncj;
+        memcpy(dst->ci, src->ci, src->nci*sizeof(nbnxn_ci_t));
+        memcpy(dst->cj, src->cj, src->ncj*sizeof(nbnxn_cj_t));
+        return dst;
+    }
+    else
+    {
+        free(src->ci);
+        free(src->cj);
+        free(src);
+        return NULL;
+    }
+}
+
+nbnxn_atomdata_t* deep_copy_nbat(nbnxn_atomdata_t *src, int new_or_delete)
+{
+    if(new_or_delete)
+    {
+        nbnxn_atomdata_t *dst;
+        dst = (nbnxn_atomdata_t*)malloc(sizeof(nbnxn_atomdata_t));
+        dst->x = (real*)malloc(src->natoms*src->xstride*sizeof(real));
+        dst->q = (real*)malloc(src->natoms*sizeof(real));
+        dst->nbfp = (real*)malloc(src->ntype*src->ntype*2*sizeof(real));
+        dst->type = (int*)malloc(src->natoms*sizeof(int));
+
+        dst->natoms = src->natoms;
+        dst->ntype = src->ntype;
+        dst->xstride = src->xstride;
+        dst->fstride = src->fstride;
+        memcpy(dst->x, src->x, src->natoms*src->xstride*sizeof(real));
+        memcpy(dst->q, src->q, src->natoms*sizeof(real));
+        memcpy(dst->nbfp, src->nbfp, src->ntype*src->ntype*2*sizeof(real));
+        memcpy(dst->type, src->type, src->natoms*sizeof(int));
+        return dst;
+    }
+    else
+    {
+        free(src->x);
+        free(src->q);
+        free(src->nbfp);
+        free(src->type);
+        free(src);
+        return NULL;
+    }
+}
+
 /*! \brief Typedefs for declaring lookup tables of kernel functions.
  */
 
