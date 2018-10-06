@@ -14,9 +14,15 @@ typedef struct {
     real                       *expand_Vvdw;
     real                       *expand_Vc;
     real                       *expand_fshift;
+
+    real *tabq_coul_F;
+    real *tabq_coul_V;
+    real *tabq_coul_FDV0;
 } func_para_t;
 
 __thread_local func_para_t device_func_para;
+__thread_local real  ldm_Vvdw = 0;
+__thread_local real  ldm_Vc = 0;
 
 /* Analytical reaction-field kernels */
 //++++++++++++++++++++++++++++++++++++
@@ -171,8 +177,17 @@ __thread_local p_nbk_func_ener p_nbk_c_energrp_device[coultNR][vdwtNR] =
 #endif
 
 
+void kaCHI_func(int n)
+{
+    TLOG("kaCHI Func called %d.\n", n);
+}
+
+
 void device_run()
 {
+#ifdef DEBUG_SDLB
+    TLOG("kaCHI 0.\n");
+#endif
     int func_type = device_in_param[FUNC_TYPE];
     int func_i    = device_in_param[FUNC_I];
     int func_j    = device_in_param[FUNC_J];
@@ -182,7 +197,10 @@ void device_run()
         OLOG("FuncType =%d, I =%d, J =%d\n", func_type, func_i, func_j);
 #endif
     if(func_type > 1 || func_i > 1 || func_j > 0)
+    {
         OLOG("UNKNOWN FUNC: FuncType =%d, I =%d, J =%d\n", func_type, func_i, func_j);
+        return;
+    }
 #define SW_PRINT_PARASIZE
 #undef SW_PRINT_PARASIZE
 #ifdef SW_PRINT_PARASIZE
@@ -194,5 +212,23 @@ void device_run()
         if(((device_notice_counter + device_param.host_rank - 1) % 64) == 0)
             OLOG("natoms =%d, fstride =%d, sizeof_f =%d, sizeof_fshift =%d\n", natoms, fstride, sizeof_f, sizeof_fshift);
     }
+#endif
+#ifdef DEBUG_SDLB
+    TLOG("kaCHI 0.1.\n");
+    kaCHI_func(0);
+    TLOG("kaCHI sizeof(nbnxn_pairlist_t) =%d\n", sizeof(nbnxn_pairlist_t));
+    //wait_host(device_core_id);
+#endif
+    if(func_type == FUNC_NO_ENER)
+    {
+        p_nbk_c_noener_device[func_i][func_j]();
+    }
+    else if(func_type == FUNC_ENER)
+    {
+        p_nbk_c_ener_device[func_i][func_j]();
+    }
+#ifdef DEBUG_SDLB
+    kaCHI_func(1);
+    TLOG("kaCHI Final.\n");
 #endif
 }

@@ -20,9 +20,8 @@ void* device_malloc(int sz)
     return (void*)ret;
 }
 
-void* device_align_malloc(int sz, int alignment, int right_shft)
+void* device_align(void* ptr, int alignment, int right_shft)
 {
-    void* ptr = ldm_malloc(sz);
     int rem = ((long)ptr) % alignment;
     if(rem > 0)
     {
@@ -32,6 +31,11 @@ void* device_align_malloc(int sz, int alignment, int right_shft)
     {
         return ptr + right_shft;
     }
+}
+
+void device_free(void *p, int sz)
+{
+    ldm_free(p, sz);
 }
 
 __thread_local volatile intv8 bcast_buff; 
@@ -69,7 +73,7 @@ void wait_host(int device_core_id)
                 sizeof(long) * PARAM_SIZE, (void*)(&sync_get_reply), 0, 0, 0
             );
             while(sync_get_reply != 1);
-            asm volatile ("#nop":::"memory");
+            asm volatile ("nop":::"memory");
             if(device_in_param[PARAM_NOTICE] >= device_notice_counter)
                 break;
         }

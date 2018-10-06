@@ -43,9 +43,14 @@
 {
     int cj;
     int i;
+    int write_cj;
 
     //TODO: ldm load: l_cj
-    cj = l_cj[cjind].cj;
+    cj               = l_cj[cjind].cj;
+    write_cj         = IN_F_BLOCK(cj);
+
+    if(write_ci || write_cj)
+    {
 
     for (i = 0; i < UNROLLI; i++)
     {
@@ -104,7 +109,10 @@
 #define interact 1.0
             skipmask = 1.0;
 #endif
-
+            DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+            TLOG("kaCHI 7.1.\n");
+#endif
             aj = cj*UNROLLJ + j;
 
             dx  = xi[i*XI_STRIDE+XX] - x[aj*X_STRIDE+XX];
@@ -113,10 +121,21 @@
 
             rsq = dx*dx + dy*dy + dz*dz;
 
+#ifdef DEBUG_FPEX
+            TLOG("xiX =%f, xiY =%f, xiZ =%f\n", xi[i*XI_STRIDE+XX], xi[i*XI_STRIDE+YY], xi[i*XI_STRIDE+ZZ]);
+            TLOG("x_X =%f, x_Y =%f, x_Z =%f\n", x[aj*X_STRIDE+XX], x[aj*X_STRIDE+YY], x[aj*X_STRIDE+ZZ]);
+            TLOG("dx =%f, dy =%f, dz =%f\n", dx, dy, dz);
+            TLOG("rsq =%f, rcut2 =%f\n", rsq, rcut2);
+#endif
+
             /* Prepare to enforce the cut-off. */
             skipmask = (rsq >= rcut2) ? 0 : skipmask;
             /* 9 flops for r^2 + cut-off check */
-
+            DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+            TLOG("kaCHI 7.2.\n");
+            //wait_host(device_core_id);
+#endif
 #ifdef CHECK_EXCLS
             /* Excluded atoms are allowed to be on top of each other.
              * To avoid overflow of rinv, rinvsq and rinvsix
@@ -156,6 +175,11 @@
                 /* 7 flops for LJ energy */
 #endif
 #endif
+                DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+                TLOG("kaCHI 7.2.1.\n");
+                //wait_host(device_core_id);
+#endif
 
 #if defined CALC_ENERGIES
                 /* Masking should be done after force switching,
@@ -171,7 +195,7 @@
                 /* 1 more flop for LJ energy */
 #endif
 
-
+                DEVICE_CODE_FENCE();
 #ifdef CALC_ENERGIES
                 Vvdw_ci += VLJ;
                 /* 1 flop for LJ energy addition */
@@ -200,6 +224,10 @@
 #endif
 
 #ifdef CALC_COUL_TAB
+            DEVICE_CODE_FENCE();
+#ifdef DEBUG_FPEX
+            TLOG("rsq =%f, tabq_scale =%f\n", rsq, device_func_para.ic->tabq_scale);
+#endif
             rs     = rsq*rinv*device_func_para.ic->tabq_scale;
             ri     = (int)rs;
             frac   = rs - ri;
@@ -213,8 +241,12 @@
             fcoul  = interact*rinvsq - fexcl;
             /* 7 flops for float 1/r-table force */
 #ifdef CALC_ENERGIES
+            DEVICE_CODE_FENCE();
 #ifndef GMX_DOUBLE
             //TODO: ldm load: tab_coul_FDV0, tab_coul_V, tab_coul_F
+#ifdef DEBUG_FPEX
+            TLOG("qq =%f, rinv =%f, interact =%f, sh_ewald =%f, halfsp =%f, frac =%f, fexcl =%f\n", qq, Vc_ci, interact, device_func_para.ic->sh_ewald, halfsp, frac, fexcl);
+#endif
             vcoul  = qq*(interact*(rinv - device_func_para.ic->sh_ewald)
                          -(tab_coul_FDV0[ri*4+2]
                            -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
@@ -227,11 +259,19 @@
 #endif
             fcoul *= qq*rinv;
 #endif
-
+            DEVICE_CODE_FENCE();
 #ifdef CALC_ENERGIES
+#ifdef DEBUG_FPEX
+            TLOG("Vc_ci =%f, vcoul =%f\n", Vc_ci, vcoul);
+#endif
             Vc_ci += vcoul;
             /* 1 flop for Coulomb energy addition */
 #endif
+#endif
+
+#ifdef DEBUG_SDLB
+            TLOG("kaCHI 7.2.2.\n");
+            //wait_host(device_core_id);
 #endif
 
 #ifdef CALC_COULOMB
@@ -256,16 +296,43 @@
             fz = fscal*dz;
 
             /* Increment i-atom force */
-            fi[i*FI_STRIDE+XX] += fx;
-            fi[i*FI_STRIDE+YY] += fy;
-            fi[i*FI_STRIDE+ZZ] += fz;
+            DEVICE_CODE_FENCE();
+#ifdef SW_NEW_ALG
+            // if(write_ci) {
+#endif
+                fi[i*FI_STRIDE+XX] += fx;
+                fi[i*FI_STRIDE+YY] += fy;
+                fi[i*FI_STRIDE+ZZ] += fz;
+#ifdef SW_NEW_ALG
+            // }
+#endif
             /* Decrement j-atom force */
-            //TODO: REDUCE SUM
-            device_func_para.f[aj*F_STRIDE+XX]  -= fx;
-            device_func_para.f[aj*F_STRIDE+YY]  -= fy;
-            device_func_para.f[aj*F_STRIDE+ZZ]  -= fz;
-            /* 9 flops for force addition */
+            DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+            TLOG("kaCHI 7.3.\n");
+            //wait_host(device_core_id);
+#endif
+#ifdef SW_NEW_ALG
+            if(write_cj) {
+#endif
+                //TODO: REDUCE SUM
+                ldm_f[aj*F_STRIDE+XX-start_f]  -= fx;
+                ldm_f[aj*F_STRIDE+YY-start_f]  -= fy;
+                ldm_f[aj*F_STRIDE+ZZ-start_f]  -= fz;
+                /* 9 flops for force addition */
+#ifdef SW_NEW_ALG
+            }
+#endif
+#ifdef DEBUG_SDLB
+            TLOG("kaCHI 7.4.\n");
+            if(j == 3)
+            {
+                //wait_host(device_core_id);
+            }
+#endif
         }
+    }
+    
     }
 }
 

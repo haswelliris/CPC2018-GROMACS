@@ -16,6 +16,9 @@
 #define OLOG(M, ...)  {if(device_core_id == 0) { \
 	                  fprintf(stderr, "[DEV  OLOG ] (RANK%d  %d): " M "", device_param.host_rank, __LINE__, ##__VA_ARGS__); }}
 
+#define ALOG(M, ...)  { \
+	                  fprintf(stderr, "[DEV  ALOG ] (RANK%d  CORE%d  %d): " M "", device_param.host_rank, device_core_id, __LINE__, ##__VA_ARGS__); }
+
 #ifndef __thread_local
 #define __thread_local const
 #endif
@@ -30,8 +33,11 @@ extern __thread_local volatile unsigned long sync_get_reply, sync_put_reply;
 extern __thread_local volatile unsigned long async_get_reply, async_put_reply; 
 extern __thread_local volatile unsigned long async_get_reply_counter, async_put_reply_counter; 
 
+#define device_sync athread_syn
+
 void* device_malloc(int sz);
-void* device_align_malloc(int sz, int alignment, int right_shft);
+void* device_align(void* ptr, int alignment, int right_shft);
+void device_free(void *p, int sz);
 
 void device_main(void *_param);
 void device_bcast_32Byte(int device_core_id, volatile intv8* bcast_data);

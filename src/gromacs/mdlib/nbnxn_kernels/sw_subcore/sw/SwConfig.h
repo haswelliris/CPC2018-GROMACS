@@ -20,7 +20,9 @@
 #define CORE_SYNC_64 0x0000FFFF
 #define CORE_SYNC_8  0x0000000F
 
-#define DEVICE_SAFE_PAD 48
+#define DEVICE_SAFE_PAD 64
+
+#define DEVICE_CODE_FENCE() {asm volatile ("nop":::"memory");}
 
 struct InitParam
 {
@@ -50,6 +52,14 @@ struct InitParam
 
 #define DENUG_F
 #undef DENUG_F
+
+#define DEBUG_SDLB
+#undef DEBUG_SDLB
+
+#define DEBUG_FPEX
+
+#define SW_NOCACLU
+#undef SW_NOCACLU
 // ----
 
 #endif

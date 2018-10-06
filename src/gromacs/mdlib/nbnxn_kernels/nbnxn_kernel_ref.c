@@ -80,6 +80,10 @@ typedef struct {
     real                       *expand_Vvdw;
     real                       *expand_Vc;
     real                       *expand_fshift;
+
+    real *tabq_coul_F;
+    real *tabq_coul_V;
+    real *tabq_coul_FDV0;
 } func_para_t;
 
 func_para_t host_func_para;
@@ -267,6 +271,52 @@ void fake_device_run()
     }
 }
 
+void deep_copy_nbl(nbnxn_pairlist_t *dst, nbnxn_pairlist_t *src, int new_dst, int del_src_and_no_copy)
+{
+    if(new_dst)
+    {
+        dst->ci = (nbnxn_ci_t*)malloc(src->nci*sizeof(nbnxn_ci_t));
+        dst->cj = (nbnxn_cj_t*)malloc(src->ncj*sizeof(nbnxn_cj_t));
+
+        dst->nci = src->nci;
+        dst->ncj = src->ncj;
+        memcpy(dst->ci, src->ci, src->nci*sizeof(nbnxn_ci_t));
+        memcpy(dst->cj, src->cj, src->ncj*sizeof(nbnxn_cj_t));
+    }
+    if(del_src_and_no_copy)
+    {
+        free(src->ci);
+        free(src->cj);
+    }
+}
+
+void deep_copy_nbat(nbnxn_atomdata_t *dst, nbnxn_atomdata_t *src, int new_dst, int del_src_and_no_copy)
+{
+    if(new_dst)
+    {
+        dst->x = (real*)malloc(src->natoms*src->xstride*sizeof(real));
+        dst->q = (real*)malloc(src->natoms*sizeof(real));
+        dst->nbfp = (real*)malloc(src->ntype*src->ntype*2*sizeof(real));
+        dst->type = (int*)malloc(src->natoms*sizeof(int));
+
+        dst->natoms = src->natoms;
+        dst->ntype = src->ntype;
+        dst->xstride = src->xstride;
+        dst->fstride = src->fstride;
+        memcpy(dst->x, src->x, src->natoms*src->xstride*sizeof(real));
+        memcpy(dst->q, src->q, src->natoms*sizeof(real));
+        memcpy(dst->nbfp, src->nbfp, src->ntype*src->ntype*2*sizeof(real));
+        memcpy(dst->type, src->type, src->natoms*sizeof(int));
+    }
+    if(del_src_and_no_copy)
+    {
+        free(src->x);
+        free(src->q);
+        free(src->nbfp);
+        free(src->type);
+    }
+}
+
 void
 nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                  const nbnxn_atomdata_t     *nbat,
@@ -371,6 +421,34 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
 
         real *expand_fshift = (real*)malloc(SHIFTS*DIM*64*sizeof(real));
 
+        real *other_f       = (real*)malloc(nbat->natoms*nbat->fstride*sizeof(real));
+        memcpy(other_f, out->f, nbat->natoms*nbat->fstride*sizeof(real));
+
+        nbnxn_pairlist_t other_nbl;
+        deep_copy_nbl(&other_nbl, nbl[nb], 1, 0);
+
+        nbnxn_atomdata_t other_nbat;
+        deep_copy_nbat(&other_nbat, nbat, 1, 0);
+
+        rvec *other_shift_vec = (rvec*)malloc(sizeof(rvec));
+        memcpy(other_shift_vec, shift_vec, sizeof(rvec));
+
+        real *other_tabq_coul_F = NULL;
+        real *other_tabq_coul_V = NULL;
+        real *other_tabq_coul_FDV0 = NULL;
+
+#ifndef GMX_DOUBLE
+        other_tabq_coul_FDV0 = (real*)malloc(ic->tabq_size*4*sizeof(real));
+        memcpy(other_tabq_coul_FDV0, ic->tabq_coul_FDV0, ic->tabq_size*4*sizeof(real));
+#else
+        other_tabq_coul_F    = (real*)malloc(ic->tabq_size*sizeof(real));
+        other_tabq_coul_V    = (real*)malloc(ic->tabq_size*sizeof(real));
+        memcpy(other_tabq_coul_F, ic->tabq_coul_F, ic->tabq_size*sizeof(real));
+        memcpy(other_tabq_coul_V, ic->tabq_coul_V, ic->tabq_size*sizeof(real));
+#endif
+#ifdef DEBUG_SDLB
+        TLOG("kaCHI sizeof(nbnxn_pairlist_t) =%d\n", sizeof(nbnxn_pairlist_t));
+#endif
         if (!(force_flags & GMX_FORCE_ENERGY))
         {
             host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
@@ -378,25 +456,28 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_out_param[FUNC_I] = coult;
             host_out_param[FUNC_J] = vdwt;
             host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
-            host_func_para.nbl = nbl[nb];
-            host_func_para.nbat = nbat;
-            host_func_para.ic = ic;
-            host_func_para.shift_vec = shift_vec;
-            host_func_para.f = out->f;
+            host_func_para.nbl = &other_nbl; // read only
+            host_func_para.nbat = &other_nbat; // read only
+            host_func_para.ic = ic;      // read only
+            host_func_para.shift_vec = other_shift_vec; // read only
+            host_func_para.f = other_f; // write only
             host_func_para.expand_Vvdw = NULL;
             host_func_para.expand_Vc = NULL;
             host_func_para.expand_fshift = expand_fshift;
+            host_func_para.tabq_coul_F = other_tabq_coul_F;
+            host_func_para.tabq_coul_V = other_tabq_coul_V;
+            host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
                 OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_NO_ENER, coult, vdwt);
             }
 #endif
-            //notice_device();
-            //wait_device();
+            notice_device();
+            wait_device();
 
             /* Don't calculate energies */
-            fake_device_run();
+            //fake_device_run();
             //p_nbk_c_noener[coult][vdwt]();
 
         }
@@ -414,26 +495,33 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_out_param[FUNC_I] = coult;
             host_out_param[FUNC_J] = vdwt;
             host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
-            host_func_para.nbl = nbl[nb];
-            host_func_para.nbat = nbat;
+            host_func_para.nbl = &other_nbl;
+            host_func_para.nbat = &other_nbat;
             host_func_para.ic = ic;
-            host_func_para.shift_vec = shift_vec;
-            host_func_para.f = out->f;
+            host_func_para.shift_vec = other_shift_vec;
+            host_func_para.f = other_f;
             host_func_para.expand_Vvdw = expand_Vvdw;
             host_func_para.expand_Vc = expand_Vc;
             host_func_para.expand_fshift = expand_fshift;
+            host_func_para.tabq_coul_F = other_tabq_coul_F;
+            host_func_para.tabq_coul_V = other_tabq_coul_V;
+            host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
                 OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_ENER, coult, vdwt);
             }
 #endif
-            //notice_device();
-            //wait_device();
+            notice_device();
+            wait_device();
 
-            fake_device_run();
+            //fake_device_run();
             //p_nbk_c_ener[coult][vdwt]();
 
+#ifdef DEBUG_FPEX
+            TLOG("MOee 0.\n");
+            //wait_device();
+#endif
             // reduce Vvdw
             int i;
             for(i = 0; i < 64 - 1; ++i)
@@ -442,7 +530,23 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
             out->Vvdw[0] = expand_Vvdw[63];
             free(expand_Vvdw);
-
+#ifdef DEBUG_FPEX
+            TLOG("MOee 0.2\n");
+            if(host_param.host_rank == 0)
+            {
+                printf("Vc= [");
+                for(i = 0; i < 64; ++i)
+                {
+                    printf(" %f", expand_Vc[i]);
+                }
+                printf("]\n");
+                wait_device();
+            }
+            else
+            {
+                wait_device();
+            }
+#endif
             // reduce Vc
             for(i = 0; i < 64 - 1; ++i)
             {
@@ -450,6 +554,10 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
             out->Vc[0] = expand_Vc[63];
             free(expand_Vc);
+#ifdef DEBUG_FPEX
+            TLOG("MOee 1.\n");
+            wait_device();
+#endif
         }
         else
         {
@@ -473,24 +581,27 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_out_param[FUNC_I] = coult;
             host_out_param[FUNC_J] = vdwt;
             host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
-            host_func_para.nbl = nbl[nb];
-            host_func_para.nbat = nbat;
+            host_func_para.nbl = &other_nbl;
+            host_func_para.nbat = &other_nbat;
             host_func_para.ic = ic;
-            host_func_para.shift_vec = shift_vec;
-            host_func_para.f = out->f;
+            host_func_para.shift_vec = other_shift_vec;
+            host_func_para.f = other_f;
             host_func_para.expand_Vvdw = expand_Vvdw;
             host_func_para.expand_Vc = expand_Vc;
             host_func_para.expand_fshift = expand_fshift;
+            host_func_para.tabq_coul_F = other_tabq_coul_F;
+            host_func_para.tabq_coul_V = other_tabq_coul_V;
+            host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
                 OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_ENERGRP, coult, vdwt);
             }
 #endif
-            //notice_device();
-            //wait_device();
+            notice_device();
+            wait_device();
 
-            fake_device_run();
+            //fake_device_run();
 #ifdef SW_ENERGRP /* in SwConfig */
             //p_nbk_c_energrp[coult][vdwt]();
 #else
@@ -531,7 +642,10 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
             free(expand_Vc);
         }
-
+#ifdef DEBUG_FPEX
+        TLOG("MOee 2.\n");
+        wait_device();
+#endif
         // reduce fshift
         int i, j;
         for(i = 0; i < 64 - 1; ++i)
@@ -541,11 +655,41 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                 expand_fshift[(i+1)*SHIFTS*DIM+j] += expand_fshift[(i)*SHIFTS*DIM+j];
             }
         }
+#ifdef DEBUG_FPEX
+        TLOG("MOee 3.\n");
+        wait_device();
+#endif
         for(j = 0; j < SHIFTS*DIM; ++j)
         {
             fshift_p[j] += expand_fshift[63*SHIFTS*DIM+j];
         }
         free(expand_fshift);
+#ifdef DEBUG_FPEX
+        TLOG("MOee 4.\n");
+        wait_device();
+#endif
+        memcpy(out->f, other_f, nbat->natoms*nbat->fstride*sizeof(real));
+        free(other_f);
+
+        deep_copy_nbl(nbl[nb], &other_nbl, 0, 1);
+
+        deep_copy_nbat(nbat, &other_nbat, 0, 1);
+#ifdef DEBUG_FPEX
+        TLOG("MOee 5.\n");
+        wait_device();
+#endif
+        free(other_shift_vec);
+
+#ifndef GMX_DOUBLE
+        free(other_tabq_coul_FDV0);
+#else
+        free(other_tabq_coul_F);
+        free(other_tabq_coul_V);
+#endif
+#ifdef DEBUG_FPEX
+        TLOG("MOee 6.\n");
+        wait_device();
+#endif
     }
 
     if (force_flags & GMX_FORCE_ENERGY)

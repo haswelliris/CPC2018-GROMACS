@@ -93,14 +93,19 @@ NBK_FUNC_NAME(_VgrpF)
 #undef NBK_FUNC_NAME2
 ()
 {
+#ifdef DEBUG_SDLB
+    TLOG("kaCHI 0.3.\n");
+    //wait_host(device_core_id);
+#endif
     // =========== DEF DATA =============
-    const nbnxn_ci_t   *nbln;
-    const nbnxn_cj_t   *l_cj;
-    const int          *type;
-    const real         *q;
-    const real         *func_para_shiftvec;
-    const real         *x;
-    const real         *nbfp;
+    //nbnxn_ci_t    nbln_o;
+    nbnxn_ci_t   *nbln;
+    nbnxn_cj_t   *l_cj;
+    int          *type;
+    real         *q;
+    real         *func_para_shiftvec;
+    real         *x;
+    real         *nbfp;
     real                rcut2;
 
     int                 ntype2;
@@ -132,13 +137,18 @@ NBK_FUNC_NAME(_VgrpF)
     real       halfsp;
 #endif
 #ifndef GMX_DOUBLE
-    const real *tab_coul_FDV0;
+    real *tab_coul_FDV0;
 #else
-    const real *tab_coul_F;
-    const real *tab_coul_V;
+    real *tab_coul_F;
+    real *tab_coul_V;
 #endif
 #endif
     // =========== DEF DATA =============
+
+#ifdef DEBUG_SDLB
+    TLOG("kaCHI 1.\n");
+    //wait_host(device_core_id);
+#endif
 
     // =========== INIT DATA =============
 #ifdef CALC_COUL_RF
@@ -155,16 +165,18 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
 
 #ifndef GMX_DOUBLE
-    tab_coul_FDV0 = device_func_para.ic->tabq_coul_FDV0;
+    tab_coul_FDV0 = device_func_para.tabq_coul_FDV0;
 #else
-    tab_coul_F    = device_func_para.ic->tabq_coul_F;
-    tab_coul_V    = device_func_para.ic->tabq_coul_V;
+    tab_coul_F    = device_func_para.tabq_coul_F;
+    tab_coul_V    = device_func_para.tabq_coul_V;
 #endif
 #endif
 
 
     rcut2               = device_func_para.ic->rcoulomb*device_func_para.ic->rcoulomb;
-
+#ifdef DEBUG_FPEX
+            TLOG("rcoulomb =%f, rcut2 =%f\n", device_func_para.ic->rcoulomb, rcut2);
+#endif
     ntype2              = device_func_para.nbat->ntype*2;
     nbfp                = device_func_para.nbat->nbfp;
     q                   = device_func_para.nbat->q;
@@ -175,25 +187,97 @@ NBK_FUNC_NAME(_VgrpF)
 
     l_cj = device_func_para.nbl->cj;
     // =========== INIT DATA =============
+    DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+    TLOG("kaCHI 2.\n");
+    //wait_host(device_core_id);
+#endif
 
-    int start_nci = BLOCK_HEAD(device_core_id, 64, device_func_para.nbl->nci);
-    int end_nci = start_nci + BLOCK_SIZE(device_core_id, 64, device_func_para.nbl->nci);
+    int natoms = device_func_para.nbat->natoms;
+    int fstride = device_func_para.nbat->fstride;
+    int sizeof_f = natoms*fstride;
+    int sizeof_fshift = SHIFTS*DIM; // 135 * sizeof(float)
 
-    for (n = start_nci; n < end_nci; n++)
+    int start_f_div_12 = BLOCK_HEAD(device_core_id, 64, sizeof_f/12);
+    int start_f = start_f_div_12*12;
+    int sz_f_div_12 = BLOCK_SIZE(device_core_id, 64, sizeof_f/12);
+    int sz_f = sz_f_div_12*12;
+    int end_f_div_12 = start_f_div_12 + sz_f_div_12;
+    int end_f = end_f_div_12*12;
+
+    DEVICE_CODE_FENCE();
+#ifdef CALC_SHIFTFORCES
+    real  ldm_fshift[SHIFTS*DIM];
+#endif
+    real* ldm_f;
+
+    //ldm_f = (real*)malloc(sz_f*sizeof(real));
+    /* FIXED: SEEMS NOT ENOUGH MEMORY */
+    void *unaligned_ldm_f = device_malloc((sz_f+DEVICE_SAFE_PAD)*sizeof(real));
+    if(unaligned_ldm_f == NULL)
     {
-        int i, d;
+        ALOG("Not enough MEM.\n");
+        return;
+    }
+    ldm_f = (real*)device_align(unaligned_ldm_f, 64, 0);
+    DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+    TLOG("kaCHI 3.\n");
+    int ii;
+    TLOG("kaCHI MY ALLOC SIZE =%d\n", (sz_f+DEVICE_SAFE_PAD)*sizeof(real));
+    /* LET ME WRITE SOME DATA TO TEST*/
+    for(ii = 0; ii < sz_f; ++ii)
+    {
+        ldm_f[ii] = ii;
+    }
+    TLOG("kaCHI 3.1.\n");
+    //wait_host(device_core_id);
+#endif
 
+#ifdef CALC_SHIFTFORCES /* Always*/
+    memset(ldm_fshift, 0, SHIFTS*DIM*sizeof(real));
+#endif
+    //memcpy(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    /* FIXED: YOUR PROBLEM!!!!!! */
+    sync_get(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+    TLOG("kaCHI 4.\n");
+    //wait_host(device_core_id);
+#endif
+
+#define IN_F_BLOCK(idx) ((idx) >= start_f_div_12 && (idx) < end_f_div_12)
+#ifndef SW_NOCACLU
+    for (n = 0; n < device_func_para.nbl->nci; n++)
+    {
+        int i, d, write_ci;
+#ifdef DEBUG_SDLB
+        TLOG("kaCHI 4.1.\n");
+        TLOG("kaCHI nci =%d, n=%d\n", device_func_para.nbl->nci, n);
+        //wait_host(device_core_id);
+#endif
+        //nbln_o = device_func_para.nbl->ci[n];
+        //nbln = &nbln_o;
         nbln = &device_func_para.nbl->ci[n];
-
+        //sync_get(nbln, device_func_para.nbl->ci+n, sizeof(nbnxn_ci_t));
+        DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+        TLOG("kaCHI 4.2.\n");
+        //wait_host(device_core_id);
+#endif
         ish              = (nbln->shift & NBNXN_CI_SHIFT);
-        /* x, device_func_para.f and device_func_para.expand_fshift are assumed to be stored with stride 3 */
+        /* x, device_func_para.f and device_func_para.fshift are assumed to be stored with stride 3 */
         ishf             = ish*DIM;
         cjind0           = nbln->cj_ind_start;
         cjind1           = nbln->cj_ind_end;
         /* Currently only works super-cells equal to sub-cells */
         ci               = nbln->ci;
         ci_sh            = (ish == CENTRAL ? ci : -1);
-
+        write_ci         = IN_F_BLOCK(ci);
+#ifdef DEBUG_SDLB
+        TLOG("kaCHI 4.3\n");
+        //wait_host(device_core_id);
+#endif
         /* We have 5 LJ/C combinations, but use only three inner loops,
          * as the other combinations are unlikely and/or not much faster:
          * inner half-LJ + C for half-LJ + C / no-LJ + C
@@ -210,7 +294,11 @@ NBK_FUNC_NAME(_VgrpF)
         Vvdw_ci = 0;
         Vc_ci   = 0;
 #endif
-
+        DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+        TLOG("kaCHI 5.\n");
+        //wait_host(device_core_id);
+#endif
         //TODO: ldm load: x, q， func_para_shiftvec
         for (i = 0; i < UNROLLI; i++)
         {
@@ -222,9 +310,13 @@ NBK_FUNC_NAME(_VgrpF)
 
             qi[i] = facel*q[ci*UNROLLI+i];
         }
-
+        DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+        TLOG("kaCHI 6.\n");
+        //wait_host(device_core_id);
+#endif
 #ifdef CALC_ENERGIES
-        if (do_self)
+        if (do_self && write_ci)
         {
             real Vc_sub_self;
 
@@ -245,12 +337,15 @@ NBK_FUNC_NAME(_VgrpF)
                 {
                     //TODO: REDUCE SUM
                     /* Coulomb self interaction */
-                    device_func_para.expand_Vc[0]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+                    ldm_Vc   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
                 }
             }
         }
 #endif  /* CALC_ENERGIES */
-
+#ifdef DEBUG_SDLB
+        TLOG("kaCHI 7.\n");
+        //wait_host(device_core_id);
+#endif
         cjind = cjind0;
         while (cjind < cjind1 && device_func_para.nbl->cj[cjind].excl != 0xffff)
         {
@@ -298,37 +393,75 @@ NBK_FUNC_NAME(_VgrpF)
 #include "nbnxn_kernel_device_inner.h"
             }
         }
-
-        /* Add accumulated i-forces to the force array */
-        for (i = 0; i < UNROLLI; i++)
+#ifdef DEBUG_SDLB
+        TLOG("kaCHI 8.\n");
+        //wait_host(device_core_id);
+#endif
+        if(write_ci)
         {
-            for (d = 0; d < DIM; d++)
-            {
-                //TODO: REDUCE SUM
-                device_func_para.f[(ci*UNROLLI+i)*F_STRIDE+d] += fi[i*FI_STRIDE+d];
-            }
-        }
-#ifdef CALC_SHIFTFORCES
-        if (device_func_para.expand_fshift != NULL)
-        {
-            /* Add i forces to shifted force list */
+            /* Add accumulated i-forces to the force array */
             for (i = 0; i < UNROLLI; i++)
             {
                 for (d = 0; d < DIM; d++)
                 {
                     //TODO: REDUCE SUM
-                    device_func_para.expand_fshift[ishf+d] += fi[i*FI_STRIDE+d];
+                    ldm_f[(ci*UNROLLI+i)*F_STRIDE+d-start_f] += fi[i*FI_STRIDE+d];
                 }
             }
-        }
+#ifdef CALC_SHIFTFORCES
+            if (device_func_para.expand_fshift != NULL)
+            {
+                /* Add i forces to shifted force list */
+                for (i = 0; i < UNROLLI; i++)
+                {
+                    for (d = 0; d < DIM; d++)
+                    {
+                        //TODO: REDUCE SUM
+                        ldm_fshift[ishf+d] += fi[i*FI_STRIDE+d];
+                    }
+                }
+            }
 #endif
-
 #ifdef CALC_ENERGIES
-        //TODO: REDUCE SUM
-        *device_func_para.expand_Vvdw += Vvdw_ci;
-        *device_func_para.expand_Vc   += Vc_ci;
+            //TODO: REDUCE SUM
+#ifdef DEBUG_FPEX
+            TLOG("ldm_Vvdw =%f, ldm_Vc =%f, Vvdw_ci =%f, Vc_ci=%f\n", ldm_Vvdw, ldm_Vc, Vvdw_ci, Vc_ci);
+#endif
+            ldm_Vvdw += Vvdw_ci;
+            ldm_Vc   += Vc_ci;
+#endif
+        }
+        DEVICE_CODE_FENCE();
+#ifdef DEBUG_SDLB
+        TLOG("kaCHI 9.\n");
+        //wait_host(device_core_id);
 #endif
     }
+    DEVICE_CODE_FENCE();
+#endif /* SW_NOCACLU */
+    //memcpy(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
+    sync_put(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
+    //free(ldm_f);
+    DEVICE_CODE_FENCE();
+    device_free(unaligned_ldm_f, (sz_f+DEVICE_SAFE_PAD)*sizeof(real));
+#ifdef CALC_SHIFTFORCES
+    if (device_func_para.expand_fshift != NULL)
+    {
+        //memcpy(device_func_para.expand_fshift+device_core_id*SHIFTS*DIM, ldm_fshift, SHIFTS*DIM*sizeof(real));
+        async_put(device_func_para.expand_fshift+device_core_id*SHIFTS*DIM, ldm_fshift, SHIFTS*DIM*sizeof(real));
+    }
+#endif
+#ifdef CALC_ENERGIES
+    sync_put(device_func_para.expand_Vvdw + device_core_id, &ldm_Vvdw, sizeof(real));
+    sync_put(device_func_para.expand_Vc   + device_core_id, &ldm_Vc, sizeof(real));
+#endif
+#ifdef DEBUG_SDLB
+    TLOG("kaCHI 10.\n");
+    //wait_host(device_core_id);
+#endif
+    DEVICE_CODE_FENCE();
+    device_sync(ARRAY_SCOPE, CORE_SYNC_64);
+#undef IN_F_BLOCK
 }
 
 #undef CALC_SHIFTFORCES
@@ -340,3 +473,4 @@ NBK_FUNC_NAME(_VgrpF)
 
 #undef UNROLLI
 #undef UNROLLJ
+
