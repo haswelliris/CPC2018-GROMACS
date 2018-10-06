@@ -24,6 +24,8 @@
 
 #define DEVICE_SAFE_PAD 48
 
+#define WORKLOAD_SIZE 3 // 3* intv8=3*4*8=96
+
 struct InitParam
 {
     int host_rank;
@@ -32,7 +34,7 @@ struct InitParam
     // ---- CUSTOM VAR
     int x_sec, y_sec, Z;
     int *walls, *flags;
-    float nu, omega, CSmago;
+    // float nu, omega, CSmago;
     // ----
 };
 
@@ -44,10 +46,10 @@ struct WorkLoadPara {
     rvec                        *shift_vec;
     real                        *f;
     real                        *fshift;
-    real                        *fshift_host;
-    real                        *Vvdw;
-    real                        *Vvdw_host;
-    real                        *Vc;
+    real                        *fshift_host;// 56
+    real                        *Vvdw; //64
+    real                        *Vvdw_host; // 72
+    real                        *Vc; // 80
     real                        *Vc_host;
 };
 

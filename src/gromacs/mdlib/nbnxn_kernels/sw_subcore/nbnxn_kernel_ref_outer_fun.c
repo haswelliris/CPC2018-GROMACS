@@ -1,8 +1,7 @@
 #include "nbnxn_kernel_ref_outer_fun.h"
-#include "SwConfig.h"
+#include <string.h>
 
 #ifdef HOST_RUN
-	#include <string.h>
 	#define aget_mem(A, B, C) memcpy(A, B, C)
 	#define sget_mem(A, B, C) memcpy(A, B, C)
 	#define put_mem(A, B, C) memcpy(A, B, C)
@@ -101,16 +100,21 @@ real						halfsp; // 初始化后保持不变
 	const real 				*tab_coul_V; // 初始化后在循环内不变，使用其数组内容
 #endif
 
-struct WorkLoadPara workLoadPara;
-
 // 注意上从核这里要加extern
+
+extern __thread_local volatile struct WorkLoadPara workLoadPara;
+
 #ifdef HOST_RUN
 void subcore_func(struct WorkLoadPara *workLoadPara_pass, int device_core_id)
 #else
 void subcore_func()
 #endif
 {
-	sget_mem(&workLoadPara, workLoadPara_pass, sizeof(struct WorkLoadPara));
+
+	if (device_core_id == 0)
+		printf("subcore_func=%ld\n", workLoadPara.macro_para);
+
+	//sget_mem(&workLoadPara, (struct WorkLoadPara *)workLoadPara_pass, sizeof(struct WorkLoadPara));
 
 	macro_para = workLoadPara.macro_para;
 	// nbl = workLoadPara.nbl;

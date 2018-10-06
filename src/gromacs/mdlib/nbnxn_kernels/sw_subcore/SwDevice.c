@@ -14,6 +14,8 @@ __thread_local volatile unsigned long sync_get_reply, sync_put_reply;
 __thread_local volatile unsigned long async_get_reply, async_put_reply; 
 __thread_local volatile unsigned long async_get_reply_counter, async_put_reply_counter; 
 
+__thread_local volatile struct WorkLoadPara workLoadPara;
+
 void* device_malloc(int sz)
 // 申请内存
 {
@@ -73,7 +75,7 @@ void wait_host(int device_core_id)
                 sizeof(long) * PARAM_SIZE, (void*)(&sync_get_reply), 0, 0, 0
             );
             while(sync_get_reply != 1);
-            asm volatile ("#nop":::"memory");
+            asm volatile ("nop":::"memory");
             if(device_in_param[PARAM_NOTICE] >= device_notice_counter)
                 break;
         }

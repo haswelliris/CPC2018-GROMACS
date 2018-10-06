@@ -2,9 +2,9 @@ CC=sw5cc
 
 all :
 	make libsubcore.a
-	make libfake.a
+	#make libfake.a
 
-libsubcore.a : SwDevice.o nbnxn_kernel_ref_outer_subcore.o SwHost.o
+libsubcore.a : SwDevice.o nbnxn_kernel_ref_outer_subcore.o SwHost.o nbnxn_kernel_ref_outer_fun.o
 	ar -crv $@ $^
 
 SwDevice.o : SwDevice.c
@@ -20,4 +20,4 @@ libfake.a : nbnxn_kernel_ref_outer_fun.o
 	ar -crv $@ $^
 	
 nbnxn_kernel_ref_outer_fun.o : nbnxn_kernel_ref_outer_fun.c nbnxn_kernel_ref_outer_fun.h nbnxn_kernel_ref_inner.h
-	${CC} -host -O3 -I/usr/sw-mpp/mpi2/include/ -lm -msimd -c $<
+	${CC} -slave -O3 -I/usr/sw-mpp/mpi2/include/ -lm -msimd -c $<

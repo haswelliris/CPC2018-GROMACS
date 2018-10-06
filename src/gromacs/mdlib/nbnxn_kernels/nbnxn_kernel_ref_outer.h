@@ -149,29 +149,30 @@ NBK_FUNC_NAME(_VgrpF)
     real Vvdw_host[64];
     real Vc_host[64];
     
-    struct WorkLoadPara workLoadPara;
-    workLoadPara.macro_para = macro_para;
-    workLoadPara.nbl        = nbl;
-    workLoadPara.nbat       = nbat;
-    workLoadPara.ic         = ic;
-    workLoadPara.shift_vec  = shift_vec;
-    workLoadPara.f          = f;
-    workLoadPara.fshift     = fshift;
-    workLoadPara.fshift_host= fshift_host;
-    workLoadPara.Vvdw       = Vvdw;
-    workLoadPara.Vvdw_host  = Vvdw_host;
-    workLoadPara.Vc         = Vc;
-    workLoadPara.Vc_host    = Vc_host;
+    hostWorkLoadPara.macro_para = macro_para;
+    hostWorkLoadPara.nbl        = nbl;
+    hostWorkLoadPara.nbat       = nbat;
+    hostWorkLoadPara.ic         = ic;
+    hostWorkLoadPara.shift_vec  = shift_vec;
+    hostWorkLoadPara.f          = f;
+    hostWorkLoadPara.fshift     = fshift;
+    hostWorkLoadPara.fshift_host= fshift_host;
+    hostWorkLoadPara.Vvdw       = Vvdw;
+    hostWorkLoadPara.Vvdw_host  = Vvdw_host;
+    hostWorkLoadPara.Vc         = Vc;
+    hostWorkLoadPara.Vc_host    = Vc_host;
 
-    // fake subcore
     int device_core_id;
-    for (device_core_id = 0; device_core_id < 64; device_core_id++)
-        subcore_func(&workLoadPara, device_core_id);
+    // fake subcore
+    // for (device_core_id = 0; device_core_id < 64; device_core_id++)
+    //     subcore_func(&hostWorkLoadPara, device_core_id);
 
     // real subcore
-    // host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara;
-    // host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
-    // notice_device()；
+    host_param.host_to_device[WORKLOADPARA] = (long)&hostWorkLoadPara;
+    host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+    // printf("notice_device=%ld\n", host_param.host_to_device[WORKLOADPARA]);
+    notice_device();
+    wait_device();
 
     int my_i;
     for (device_core_id = 0; device_core_id < 64-1; device_core_id++)

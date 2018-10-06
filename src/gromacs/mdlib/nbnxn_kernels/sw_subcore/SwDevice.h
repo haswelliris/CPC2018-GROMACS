@@ -31,6 +31,8 @@ extern __thread_local volatile unsigned long sync_get_reply, sync_put_reply;
 extern __thread_local volatile unsigned long async_get_reply, async_put_reply; 
 extern __thread_local volatile unsigned long async_get_reply_counter, async_put_reply_counter; 
 
+extern __thread_local volatile struct WorkLoadPara workLoadPara;
+
 void* device_malloc(int sz);
 void* device_align_malloc(int sz, int alignment, int right_shft);
 
