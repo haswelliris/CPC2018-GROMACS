@@ -148,13 +148,16 @@ NBK_FUNC_NAME(_VgrpF)
     real fshift_host[64*SHIFTS*DIM];
     real Vvdw_host[64];
     real Vc_host[64];
+
+    real *f_host = (real*)malloc(nbat->natoms*F_STRIDE*sizeof(real));
+    memcpy(f_host, f, nbat->natoms*F_STRIDE*sizeof(real));
     
     workLoadPara_host.macro_para = macro_para;
     workLoadPara_host.nbl        = nbl;
     workLoadPara_host.nbat       = nbat;
     workLoadPara_host.ic         = ic;
     workLoadPara_host.shift_vec  = shift_vec;
-    workLoadPara_host.f          = f;
+    workLoadPara_host.f          = f_host;
     workLoadPara_host.fshift     = fshift;
     workLoadPara_host.fshift_host= fshift_host;
     workLoadPara_host.Vvdw       = Vvdw;
@@ -165,16 +168,18 @@ NBK_FUNC_NAME(_VgrpF)
     int device_core_id;
 
     // fake subcore
-    // for (device_core_id = 0; device_core_id < 64; device_core_id++)
-    //     subcore_func(&workLoadPara_host, device_core_id);
+    for (device_core_id = 0; device_core_id < 64; device_core_id++)
+        subcore_func(&workLoadPara_host, device_core_id);
 
     // real subcore
-    host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara_host;
-    host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
-    notice_device();
-    wait_device();
-    printf("done!\n");
-    exit(0);
+    // host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara_host;
+    // host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+    // notice_device();
+    // wait_device();
+    // printf("done!\n");
+    // exit(0);
+
+    memcpy(f, f_host, nbat->natoms*F_STRIDE*sizeof(real));
 
     int my_i;
     for (device_core_id = 0; device_core_id < 64-1; device_core_id++)

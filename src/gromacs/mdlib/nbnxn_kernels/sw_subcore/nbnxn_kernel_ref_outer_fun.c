@@ -113,8 +113,6 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 {
 	sget_mem(&workLoadPara, workLoadPara_pass, sizeof(struct WorkLoadPara));
 
-#ifdef HOST_RUN
-
 	macro_para = workLoadPara.macro_para;
 	// nbl = workLoadPara.nbl;
 	// nbat = workLoadPara.nbat;
@@ -147,6 +145,9 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 	#ifndef HOST_RUN
 		wait_all_async_get();
 	#endif
+
+#ifdef HOST_RUN
+
 
 	// end load obj
 
