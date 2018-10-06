@@ -15,6 +15,8 @@
 #define XC_LOG2 (4)
 #endif
 
+// ===== CACHE =====
+// -----   x   -----
 typedef struct {
     real C[XC_SZ];
     int hd;
@@ -36,6 +38,7 @@ static inline real *xi_C(unsigned int gp_i)
     {
         return &Cxi.C[Coffset*XC_GP];
     }
+    #ifndef DEEP_DARK_FANTASY
     if((gp_i+XC_MSK+1) <= Sxi)
     {
         fetch_sz = XC_SZ;
@@ -44,6 +47,9 @@ static inline real *xi_C(unsigned int gp_i)
     {
         fetch_sz = (Sxi-gp_i)*12;
     }
+    #else
+    fetch_sz = XC_SZ;
+    #endif
     sync_get(&Cxi.C[0], Hxi+XC_SZ*Chead, fetch_sz*sizeof(real));
     DEVICE_CODE_FENCE();
     return &Cxi.C[Coffset*XC_GP];
@@ -58,6 +64,7 @@ static inline real *xj_C(unsigned int gp_i)
     {
         return &Cxj.C[Coffset*XC_GP];
     }
+    #ifndef DEEP_DARK_FANTASY
     else if((gp_i+XC_MSK+1) <= Sxj)
     {
         fetch_sz = XC_SZ;
@@ -66,11 +73,18 @@ static inline real *xj_C(unsigned int gp_i)
     {
         fetch_sz = (Sxj-gp_i)*12;   
     }
+    #else
+    fetch_sz = XC_SZ;
+    #endif
     Cxj.hd = Chead;
     sync_get(&Cxj.C[0], Hxj+XC_SZ*Chead, fetch_sz*sizeof(real));
     DEVICE_CODE_FENCE();
     return &Cxj.C[Coffset*XC_GP];
 }
+
+// ===== CACHE =====
+// -----   q   -----
+// -----   t   -----
 
 #define QT_GP   (4)
 #ifndef GMX_DOUBLE
@@ -86,37 +100,154 @@ static inline real *xj_C(unsigned int gp_i)
 typedef struct {
     real C[QT_SZ];
     int hd;
-} _qt_cache_t;
-
-__thread_local _qt_cache_t Cqi; // 1024 B
+} _q_cache_t;
+__thread_local real       *Hqi; // origin q address    
+__thread_local _q_cache_t Cqi; // 1024 B
+// current don't care Size of q
 __thread_local int         Sqi;
-__thread_local _qt_cache_t Cqj; // 1024 B
+__thread_local real       *Hqj; // origin q address    
+__thread_local _q_cache_t Cqj; // 1024 B
 __thread_local int         Sqj;
 
-__thread_local _qt_cache_t Cti; // 1024 B
+// ------------------------------------------
+// |  我注意到type是int数组，所以跟q分开定义了 |
+// ------------------------------------------
+typedef struct {
+    int C[QT_SZ];
+    int hd;
+} _t_cache_t;
+// ------------------------------------------
+// |  我注意到type是int数组，所以跟q分开定义了 |
+// ------------------------------------------
+// 或许是熬夜脑子晕我看错了。。。。
+__thread_local int       *Hti; // origin t address    
+__thread_local _t_cache_t Cti; // 1024 B
 __thread_local int         Sti; 
-__thread_local _qt_cache_t Ctj; // 1024 B
+__thread_local int       *Htj; // origin t address    
+__thread_local _t_cache_t Ctj; // 1024 B
 __thread_local int         Stj;
 
-static inline real *qi_C(int idx)
+static inline real *qi_C(unsigned int idx)
 {
-
+    int Coffset = M2_MOD(idx,QT_MSK);
+    int Chead   = M2_DIV(idx,QT_LOG2);
+    int fetch_sz;
+    if(Chead == Cqi.hd)
+    {
+#ifdef COUNT_CACHE_HITS
+        TLOG("NICE! Cache HIT : qi\n");
+#endif
+        return &Cqi.C[Coffset*QT_GP];
+    }
+#ifdef COUNT_CACHE_HITS
+        TLOG("Opps! Cache MISS : qi\n");
+#endif
+    #ifndef DEEP_DARK_FANTASY
+    else if((idx+QT_MSK+1) <= Sqi)
+    {
+        fetch_sz = QT_SZ;
+    }
+    else
+    {
+        fetch_sz = (Sqi-idx)*12;   
+    }
+    #else
+    fetch_sz = QT_SZ;
+    #endif
+    Cqi.hd = Chead;
+    sync_get(&Cqi.C[0], Hqi+QT_SZ*Chead, fetch_sz*sizeof(real));
+    DEVICE_CODE_FENCE();
+    return &Cqi.C[Coffset*QT_GP];
 }
 
-static inline real *qj_C(int idx)
+static inline real *qj_C(unsigned int idx)
 {
-
+    int Coffset = M2_MOD(idx,QT_MSK);
+    int Chead   = M2_DIV(idx,QT_LOG2);
+    int fetch_sz;
+    if(Chead == Cqj.hd)
+    {
+#ifdef COUNT_CACHE_HITS
+        TLOG("NICE! Cache HIT : qj\n");
+#endif
+        return &Cqj.C[Coffset*QT_GP];
+    }
+#ifdef COUNT_CACHE_HITS
+        TLOG("Opps! Cache MISS : qj\n");
+#endif
+    #ifndef DEEP_DARK_FANTASY
+    else if((idx+QT_MSK+1) <= Sqj)
+    {
+        fetch_sz = QT_SZ;
+    }
+    else
+    {
+        fetch_sz = (Sqj-idx)*12;   
+    }
+    #else
+    fetch_sz = QT_SZ;
+    #endif
+    Cqj.hd = Chead;
+    sync_get(&Cqj.C[0], Hqj+QT_SZ*Chead, fetch_sz*sizeof(real));
+    DEVICE_CODE_FENCE();
+    return &Cqj.C[Coffset*QT_GP];
 }
 
-static inline real *ti_C(int idx)
-{
+    // type 上爆了。。。。
+// static inline int *ti_C(unsigned int idx)
+// {
+//     int Coffset = M2_MOD(idx,QT_MSK);
+//     int Chead   = M2_DIV(idx,QT_LOG2);
+//     int fetch_sz;
+//     if(Chead == Cti.hd)
+//     {
+//         return &Cti.C[Coffset*QT_GP];
+//     }
+//     #ifndef DEEP_DARK_FANTASY
+//     else if((idx+QT_MSK+1) <= Sti)
+//     {
+//         fetch_sz = QT_SZ;
+//     }
+//     else
+//     {
+//         fetch_sz = (Sti-idx)*12;   
+//     }
+//     #else
+//     fetch_sz = QT_SZ;
+//     #endif
+//     Cti.hd = Chead;
+//     sync_get(&Cti.C[0], Hti+QT_SZ*Chead, fetch_sz*sizeof(int));
+//     DEVICE_CODE_FENCE();
+//     return &Cti.C[Coffset*QT_GP];
+// }
 
-}
-
-static inline real *tj_C(int idx)
-{
-
-}
+    // type 上爆了。。。。
+// static inline int *tj_C(unsigned int idx)
+// {
+//     int Coffset = M2_MOD(idx,QT_MSK);
+//     int Chead   = M2_DIV(idx,QT_LOG2);
+//     int fetch_sz;
+//     if(Chead == Ctj.hd)
+//     {
+//         return &Ctj.C[Coffset*QT_GP];
+//     }
+//     #ifndef DEEP_DARK_FANTASY
+//     else if((idx+QT_MSK+1) <= Sqj)
+//     {
+//         fetch_sz = QT_SZ;
+//     }
+//     else
+//     {
+//         fetch_sz = (Sqj-idx)*12;   
+//     }
+//     #else
+//     fetch_sz = QT_SZ;
+//     #endif
+//     Ctj.hd = Chead;
+//     sync_get(&Ctj.C[0], Htj+QT_SZ*Chead, fetch_sz*sizeof(int));
+//     DEVICE_CODE_FENCE();
+//     return &Ctj.C[Coffset*XC_GP];
+// }
 
 #define CI_GP   (1)
 #define CI_SZ   (64)

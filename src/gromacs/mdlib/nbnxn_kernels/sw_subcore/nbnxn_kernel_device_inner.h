@@ -49,7 +49,9 @@
     cj               = l_cj[cjind].cj;
     write_cj         = IN_F_BLOCK(cj);
     Cxj_p = xj_C(cj);
-
+    Cqj_p = qj_C(cj);
+    // type 上爆了。。。。
+    // Ctj_p = tj_C(cj);
     if(write_ci || write_cj)
     {
 
@@ -62,6 +64,13 @@
         ai = ci*UNROLLI + i;
 
         //TODO: ldm load: type
+    // type 上爆了。。。。
+// #ifdef DEBUG_CACHE
+//         if(type[ai] != Cti_p[i])
+//         {
+//             TLOG("KAAAA! Cache ERR: ci =%d\n", ci);
+//         }
+// #endif
         type_i_off = type[ai]*ntype2;
 
         for (j = 0; j < UNROLLJ; j++)
@@ -178,6 +187,13 @@
 #endif
             {
                 //TODO: ldm load: nbfp
+    // type 上爆了。。。。
+// #ifdef DEBUG_CACHE
+//                 if(type[aj] != Ctj_p[j])
+//                 {
+//                     TLOG("KAAAA! Cache ERR: type: wanted: %d bug got: %d\n", type[aj], Ctj_p[j]);
+//                 }
+// #endif
                 c6      = nbfp[type_i_off+type[aj]*2  ];
                 c12     = nbfp[type_i_off+type[aj]*2+1];
 
@@ -230,8 +246,14 @@
              * to the force and potential, and the easiest way
              * to do this is to zero the charges in
              * advance. */
-            qq = skipmask * qi[i] * q[aj];
-
+#ifdef DEBUG_CACHE
+            if(q[aj] != Cqj_p[j])
+            {
+                TLOG("KAAAA! Cache ERR: cj =%d\n", cj);
+            }
+#endif
+            // qq = skipmask * qi[i] * q[aj];
+            qq = skipmask * qi[i] * Cqj_p[j];
 #ifdef CALC_COUL_RF
             fcoul  = qq*(interact*rinv*rinvsq - k_rf2);
             /* 4 flops for RF force */
