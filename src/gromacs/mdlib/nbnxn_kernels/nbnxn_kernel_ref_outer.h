@@ -148,6 +148,9 @@ NBK_FUNC_NAME(_VgrpF)
     real fshift_host[64*SHIFTS*DIM];
     real Vvdw_host[64];
     real Vc_host[64];
+
+    real* f_temp = (real*)malloc(sizeof(real)*(nbat->natoms)*F_STRIDE);
+    memcpy(f_temp,f,sizeof(real)*(nbat->natoms)*F_STRIDE);
     
     hostWorkLoadPara.macro_para = macro_para;
     hostWorkLoadPara.nbl        = nbl;

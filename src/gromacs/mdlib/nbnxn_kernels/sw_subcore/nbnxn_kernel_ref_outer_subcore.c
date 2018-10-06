@@ -34,6 +34,6 @@ void device_run() {
 	        asm volatile ("nop":::"memory");
 	// asm volatile("halt");
 	// printf("workLoadPara=%ld\n", workLoadPara.macro_para);
-	// subcore_func();
+	subcore_func();
 	        asm volatile ("nop":::"memory");
 }
