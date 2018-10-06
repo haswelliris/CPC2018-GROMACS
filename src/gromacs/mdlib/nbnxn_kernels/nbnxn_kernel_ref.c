@@ -461,12 +461,12 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_func_para.ic = ic;      // read only
             host_func_para.shift_vec = other_shift_vec; // read only
             host_func_para.f = other_f; // write only
-            host_func_para.expand_Vvdw = NULL;
-            host_func_para.expand_Vc = NULL;
-            host_func_para.expand_fshift = expand_fshift;
-            host_func_para.tabq_coul_F = other_tabq_coul_F;
-            host_func_para.tabq_coul_V = other_tabq_coul_V;
-            host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;
+            host_func_para.expand_Vvdw = NULL;// write only
+            host_func_para.expand_Vc = NULL;// write only
+            host_func_para.expand_fshift = expand_fshift;// write only
+            host_func_para.tabq_coul_F = other_tabq_coul_F;// read only
+            host_func_para.tabq_coul_V = other_tabq_coul_V;// read only
+            host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;// read only
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
