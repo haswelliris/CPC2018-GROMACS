@@ -49,6 +49,9 @@ struct WorkLoadPara {
     real                        *Vvdw_host;
     real                        *Vc;
     real                        *Vc_host;
+    real                        *tabq_coul_FDV0;
+    real                        *tabq_coul_F;
+    real                        *tabq_coul_V;
 };
 
 // ---- CUSTOM CONFIG

@@ -156,6 +156,16 @@ NBK_FUNC_NAME(_VgrpF)
     rvec *shift_vec_host = (rvec*)malloc(SHIFTS*DIM*sizeof(real));
     memcpy(shift_vec_host, shift_vec, SHIFTS*DIM*sizeof(real));
 
+    #ifndef GMX_DOUBLE
+        real *tabq_coul_FDV0_host = (real*)malloc(ic->tabq_size*4*sizeof(real));
+        memcpy(tabq_coul_FDV0_host, ic->tabq_coul_FDV0, ic->tabq_size*4*sizeof(real));
+    #else
+        real *tabq_coul_F_host    = (real*)malloc(ic->tabq_size*sizeof(real));
+        real *tabq_coul_V_host    = (real*)malloc(ic->tabq_size*sizeof(real));
+        memcpy(tabq_coul_F_host, ic->tabq_coul_F, ic->tabq_size*sizeof(real));
+        memcpy(tabq_coul_V_host, ic->tabq_coul_V, ic->tabq_size*sizeof(real));
+    #endif
+
     workLoadPara_host.macro_para = macro_para;
     workLoadPara_host.nbl        = nbl_host;
     workLoadPara_host.nbat       = nbat_host;
@@ -168,6 +178,12 @@ NBK_FUNC_NAME(_VgrpF)
     workLoadPara_host.Vvdw_host  = Vvdw_host;
     workLoadPara_host.Vc         = Vc;
     workLoadPara_host.Vc_host    = Vc_host;
+    #ifndef GMX_DOUBLE
+        workLoadPara_host.tabq_coul_FDV0 = tabq_coul_FDV0_host;
+    #else
+        workLoadPara_host.tabq_coul_F = tabq_coul_F_host;
+        workLoadPara_host.tabq_coul_V = tabq_coul_V_host;
+    #endif
 
     int device_core_id;
 

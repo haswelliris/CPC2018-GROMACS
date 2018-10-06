@@ -192,10 +192,10 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 		}
 
 		#ifndef GMX_DOUBLE
-	    	tab_coul_FDV0 = ic.tabq_coul_FDV0;
+	    	tab_coul_FDV0 = workLoadPara.tabq_coul_FDV0;
 		#else
-	    	tab_coul_F    = ic.tabq_coul_F;
-	    	tab_coul_V    = ic.tabq_coul_V;
+	    	tab_coul_F    = workLoadPara.tabq_coul_F;
+	    	tab_coul_V    = workLoadPara.tabq_coul_V;
 		#endif
 	}
 
