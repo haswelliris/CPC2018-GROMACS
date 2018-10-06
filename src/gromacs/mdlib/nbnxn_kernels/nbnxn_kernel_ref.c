@@ -52,7 +52,6 @@
 #include "gromacs/utility/smalloc.h"
 
 #include "gromacs/mdlib/nbnxn_kernels/sw_subcore/SwHost.h"
-extern struct InitParam host_param;
 extern void subcore_fun( struct WorkLoadPara *, int);
 
 /*! \brief Typedefs for declaring lookup tables of kernel functions.

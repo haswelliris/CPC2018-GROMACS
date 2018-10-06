@@ -122,22 +122,25 @@ void subcore_func()
 	Vvdw = workLoadPara.Vvdw;
 	Vc = workLoadPara.Vc;
 
-	int f_start = BLOCK_HEAD(device_core_id, 64, nbat.natoms/4)*12;
-    int f_end = f_start + BLOCK_SIZE(device_core_id, 64, nbat.natoms/4)*12;
-    if (f_end - f_start > F_LOCAL_SIZE)
-    	printf("F_LOCAL_SIZE is not big enough!\n");
-
 	// load obj
 
 	aget_mem(&nbl, workLoadPara.nbl, sizeof(nbnxn_pairlist_t));
 	aget_mem(&nbat, workLoadPara.nbat, sizeof(nbnxn_atomdata_t));
 	aget_mem(&ic, workLoadPara.ic, sizeof(interaction_const_t));
-	aget_mem(f_local, f+f_start, (f_end-f_start)*sizeof(real));
 
 	memset(fshift_local, 0, sizeof(fshift_local));
 	Vvdw_local = 0;
 	Vc_local = 0;
 
+	#ifndef HOST_RUN
+		wait_all_async_get();
+	#endif
+
+	int f_start = BLOCK_HEAD(device_core_id, 64, nbat.natoms/4)*12;
+    int f_end = f_start + BLOCK_SIZE(device_core_id, 64, nbat.natoms/4)*12;
+    if (f_end - f_start > F_LOCAL_SIZE)
+    	printf("F_LOCAL_SIZE is not big enough!\n");
+	aget_mem(f_local, f+f_start, (f_end-f_start)*sizeof(real));
 	#ifndef HOST_RUN
 		wait_all_async_get();
 	#endif
