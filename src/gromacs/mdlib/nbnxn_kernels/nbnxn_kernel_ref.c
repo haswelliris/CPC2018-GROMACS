@@ -446,6 +446,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         memcpy(other_tabq_coul_F, ic->tabq_coul_F, ic->tabq_size*sizeof(real));
         memcpy(other_tabq_coul_V, ic->tabq_coul_V, ic->tabq_size*sizeof(real));
 #endif
+        //TLOG("tabq_size =%d, ntype =%d, natoms =%d\n", ic->tabq_size, nbat->ntype, nbat->natoms);
 #ifdef DEBUG_SDLB
         TLOG("kaCHI sizeof(nbnxn_pairlist_t) =%d\n", sizeof(nbnxn_pairlist_t));
 #endif
@@ -460,10 +461,10 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_func_para.nbat = &other_nbat; // read only
             host_func_para.ic = ic;      // read only
             host_func_para.shift_vec = other_shift_vec; // read only
-            host_func_para.f = other_f; // write only
-            host_func_para.expand_Vvdw = NULL;// write only
-            host_func_para.expand_Vc = NULL;// write only
-            host_func_para.expand_fshift = expand_fshift;// write only
+            host_func_para.f = other_f; // write only, reduce FIN
+            host_func_para.expand_Vvdw = NULL;// write only, reduce FIN
+            host_func_para.expand_Vc = NULL;// write only, reduce FIN
+            host_func_para.expand_fshift = expand_fshift;// write only, reduce FIN
             host_func_para.tabq_coul_F = other_tabq_coul_F;// read only
             host_func_para.tabq_coul_V = other_tabq_coul_V;// read only
             host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;// read only

@@ -1,6 +1,202 @@
 #include "sw/SwDevice.h"
 #include "nbnxn_kernels_device.h"
 
+#define M2_DIV(X,M2_LOG2) ((X)>>(M2_LOG2))
+#define M2_MOD(X,MSK) ((X)&(MSK))
+
+#define XC_GP   (12)
+#ifndef GMX_DOUBLE
+#define XC_SZ   (384) //(32*12)
+#define XC_MSK  (31)
+#define XC_LOG2 (5)
+#else
+#define XC_SZ   (192) //(16*12)
+#define XC_MSK  (15)
+#define XC_LOG2 (4)
+#endif
+
+typedef struct {
+    real C[XC_SZ];
+    int hd;
+} _x_cache_t;
+
+__thread_local real      *Hxi;      
+__thread_local _x_cache_t Cxi; // 1536 B
+__thread_local int        Sxi; // sizeof(x)/12
+__thread_local real      *Hxj; 
+__thread_local _x_cache_t Cxj; // 1536 B
+__thread_local int        Sxj; // sizeof(x)/12
+
+static inline real *xi_C(unsigned int gp_i)
+{
+    int Coffset = M2_MOD(gp_i,XC_MSK);
+    int Chead   = M2_DIV(gp_i,XC_LOG2);
+    if(Chead == Cxi.hd)
+    {
+// #ifdef DEBUG_CACHE
+//         TLOG("KAAAA! Cache HIT: gp_i =%d, Chead =%d, Coffset =%d\n", gp_i, Chead, Coffset);
+// #endif
+        return &Cxi.C[Coffset*XC_GP];
+    }
+    else if((gp_i+XC_MSK+1) <= Sxi)
+    {
+// #ifdef DEBUG_CACHE
+//         TLOG("KAAAA! Cache MISS AAA: gp_i =%d, Chead =%d, Coffset =%d\n", gp_i, Chead, Coffset);
+// #endif
+        Cxi.hd = Chead;
+        sync_get(&Cxi.C[0], Hxi+XC_SZ*Chead, XC_SZ*sizeof(real));
+        DEVICE_CODE_FENCE();
+        return &Cxi.C[Coffset*XC_GP];
+    }
+    else
+    {
+// #ifdef DEBUG_CACHE
+//         TLOG("KAAAA! Cache MISS BBB: gp_i =%d, Chead =%d, Coffset =%d\n", gp_i, Chead, Coffset);
+// #endif
+        Cxi.hd = Chead;
+        sync_get(&Cxi.C[0], Hxi+XC_SZ*Chead, (Sxi-gp_i)*12*sizeof(real));
+        DEVICE_CODE_FENCE();
+        return &Cxi.C[Coffset*XC_GP];
+    }
+}
+
+static inline real *xj_C(unsigned int gp_i)
+{
+    int Coffset = M2_MOD(gp_i,XC_MSK);
+    int Chead   = M2_DIV(gp_i,XC_LOG2);
+    if(Chead == Cxj.hd)
+    {
+        return &Cxj.C[Coffset*XC_GP];
+    }
+    else if((gp_i+XC_MSK+1) <= Sxj)
+    {
+        Cxj.hd = Chead;
+        sync_get(&Cxj.C[0], Hxj+XC_SZ*Chead, XC_SZ*sizeof(real));
+        DEVICE_CODE_FENCE();
+        return &Cxj.C[Coffset*XC_GP];
+    }
+    else
+    {
+        Cxj.hd = Chead;
+        sync_get(&Cxj.C[0], Hxj+XC_SZ*Chead, (Sxj-gp_i)*12*sizeof(real));
+        DEVICE_CODE_FENCE();
+        return &Cxj.C[Coffset*XC_GP];
+    }
+}
+
+#ifndef GMX_DOUBLE
+#define QT_SZ   (256) //(64*4)
+#define QT_MSK  (63)
+#define QT_LOG2 (6)
+#else
+#define QT_SZ   (128) //(32*4)
+#define QT_MSK  (31)
+#define QT_LOG2 (5)
+#endif
+
+typedef struct {
+    real C[QT_SZ];
+    int hd;
+} _qt_cache_t;
+
+__thread_local _qt_cache_t Cqi; // 1024 B
+__thread_local int         Sqi;
+__thread_local _qt_cache_t Cqj; // 1024 B
+__thread_local int         Sqj;
+
+__thread_local _qt_cache_t Cti; // 1024 B
+__thread_local int         Sti; 
+__thread_local _qt_cache_t Ctj; // 1024 B
+__thread_local int         Stj;
+
+static inline real *qi_C(int idx)
+{
+
+}
+
+static inline real *qj_C(int idx)
+{
+
+}
+
+static inline real *ti_C(int idx)
+{
+
+}
+
+static inline real *tj_C(int idx)
+{
+
+}
+
+#define CI_SZ   (64)
+#define CI_MSK  (63)
+#define CI_LOG2 (6)
+typedef struct {
+    nbnxn_ci_t C[CI_SZ];
+    int hd;
+} _ci_cache_t;
+
+__thread_local _ci_cache_t Cci; // 1024 B
+__thread_local int         Sci;
+static inline _ci_cache_t *ci_C(int idx)
+{
+
+}
+
+#define CJ_SZ   (128)
+#define CJ_MSK  (127)
+#define CJ_LOG2 (7)
+typedef struct {
+    nbnxn_cj_t C[CJ_SZ];
+    int hd;
+} _cj_cache_t;
+
+__thread_local int           Scj; // 1024 B
+__thread_local _cj_cache_t   Ccj;
+static inline _cj_cache_t *cj_C(int idx)
+{
+
+}
+
+#ifndef GMX_DOUBLE
+#define NF_SZ   (256) //(128*2)
+#define NF_MSK  (127)
+#define NF_LOG2 (7)
+#else
+#define NF_C_SZ (128) //(64*2)
+#define NF_MSK  (63)
+#define NF_LOG2 (6)
+#endif
+
+typedef struct {
+    real C[NF_SZ];
+    int hd;
+} _nf_cache_t;
+
+__thread_local _nf_cache_t Cnf; // 1024 B
+__thread_local int         Snf;
+static inline real *nf_C(int idx)
+{
+
+}
+
+static inline void clear_C()
+{
+   Cxi.hd = -1;
+   Cxj.hd = -1;
+
+   Cqi.hd = -1;
+   Cqj.hd = -1;
+   Cti.hd = -1;
+   Ctj.hd = -1;
+
+   Cci.hd = -1;
+   Ccj.hd = -1;
+
+   Cnf.hd = -1;
+}
+
 typedef void (*p_nbk_func_noener)();
 
 typedef void (*p_nbk_func_ener)();

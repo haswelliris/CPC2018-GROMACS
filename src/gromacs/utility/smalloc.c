@@ -63,10 +63,9 @@
 
 static gmx_bool            g_bOverAllocDD     = FALSE;
 static tMPI_Thread_mutex_t g_over_alloc_mutex = TMPI_THREAD_MUTEX_INITIALIZER;
-static tMPI_Thread_mutex_t gmx_logfile_mtx    = TMPI_THREAD_MUTEX_INITIALIZER;
 
-#define DEBUG
 #ifdef DEBUG
+static tMPI_Thread_mutex_t gmx_logfile_mtx    = TMPI_THREAD_MUTEX_INITIALIZER;
 static void log_action(int bMal, const char *what, const char *file, int line,
                        int nelem, int size, void *ptr)
 {
@@ -165,7 +164,6 @@ void *save_calloc(const char *name, const char *file, int line,
                    nelem*elsize/1048576.0, name, file, line, rank);
         }
 #endif
-#define GMX_BROKEN_CALLOC
 #ifdef GMX_BROKEN_CALLOC
         /* emulate calloc(3) with malloc/memset on machines with
            a broken calloc, e.g. in -lgmalloc on cray xt3. */
@@ -190,7 +188,6 @@ void *save_calloc(const char *name, const char *file, int line,
                       (gmx_int64_t)nelem, (gmx_int64_t)elsize, name, file, line);
         }
 #endif
-#undef GMX_BROKEN_CALLOC
     }
 #ifdef DEBUG
     log_action(1, name, file, line, nelem, elsize, p);
@@ -387,4 +384,3 @@ int over_alloc_dd(int n)
         return n;
     }
 }
-#undef DEBUG

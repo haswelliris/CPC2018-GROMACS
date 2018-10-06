@@ -48,6 +48,7 @@
     //TODO: ldm load: l_cj
     cj               = l_cj[cjind].cj;
     write_cj         = IN_F_BLOCK(cj);
+    Cxj_p = xj_C(cj);
 
     if(write_ci || write_cj)
     {
@@ -115,9 +116,26 @@
 #endif
             aj = cj*UNROLLJ + j;
 
-            dx  = xi[i*XI_STRIDE+XX] - x[aj*X_STRIDE+XX];
-            dy  = xi[i*XI_STRIDE+YY] - x[aj*X_STRIDE+YY];
-            dz  = xi[i*XI_STRIDE+ZZ] - x[aj*X_STRIDE+ZZ];
+            // dx  = xi[i*XI_STRIDE+XX] - x[aj*X_STRIDE+XX];
+            // dy  = xi[i*XI_STRIDE+YY] - x[aj*X_STRIDE+YY];
+            // dz  = xi[i*XI_STRIDE+ZZ] - x[aj*X_STRIDE+ZZ];
+            dx  = xi[i*XI_STRIDE+XX] - Cxj_p[j*X_STRIDE+XX];
+            dy  = xi[i*XI_STRIDE+YY] - Cxj_p[j*X_STRIDE+YY];
+            dz  = xi[i*XI_STRIDE+ZZ] - Cxj_p[j*X_STRIDE+ZZ];
+#ifdef DEBUG_CACHE
+            if(x[aj*X_STRIDE+XX] != Cxj_p[j*X_STRIDE+XX])
+            {
+                TLOG("KAAAA! Cache ERR: cj =%d\n", cj);
+            }
+            if(x[aj*X_STRIDE+YY] != Cxj_p[j*X_STRIDE+YY])
+            {
+                TLOG("KAAAA! Cache ERR: cj =%d\n", cj);
+            }
+            if(x[aj*X_STRIDE+ZZ] != Cxj_p[j*X_STRIDE+ZZ])
+            {
+                TLOG("KAAAA! Cache ERR: cj =%d\n", cj);
+            }
+#endif
 
             rsq = dx*dx + dy*dy + dz*dz;
 

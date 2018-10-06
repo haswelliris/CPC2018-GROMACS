@@ -196,14 +196,27 @@ NBK_FUNC_NAME(_VgrpF)
     int natoms = device_func_para.nbat->natoms;
     int fstride = device_func_para.nbat->fstride;
     int sizeof_f = natoms*fstride;
+    int sizeof_f_div_12 = sizeof_f/12;
     int sizeof_fshift = SHIFTS*DIM; // 135 * sizeof(float)
 
-    int start_f_div_12 = BLOCK_HEAD(device_core_id, 64, sizeof_f/12);
+    int start_f_div_12 = BLOCK_HEAD(device_core_id, 64, sizeof_f_div_12);
     int start_f = start_f_div_12*12;
-    int sz_f_div_12 = BLOCK_SIZE(device_core_id, 64, sizeof_f/12);
+    int sz_f_div_12 = BLOCK_SIZE(device_core_id, 64, sizeof_f_div_12);
     int sz_f = sz_f_div_12*12;
     int end_f_div_12 = start_f_div_12 + sz_f_div_12;
     int end_f = end_f_div_12*12;
+
+    // ===== INIT CACHE ===== 
+    real *Cxi_p;
+    real *Cxj_p;
+    {
+        clear_C();
+        Hxi = x;
+        Sxi = sizeof_f_div_12;
+        Hxj = x;
+        Sxj = sizeof_f_div_12;
+    }
+    // ===== INIT CACHE =====
 
     DEVICE_CODE_FENCE();
 #ifdef CALC_SHIFTFORCES
@@ -301,11 +314,19 @@ NBK_FUNC_NAME(_VgrpF)
         //wait_host(device_core_id);
 #endif
         //TODO: ldm load: x, q， func_para_shiftvec
+        Cxi_p = xi_C(ci);
         for (i = 0; i < UNROLLI; i++)
         {
             for (d = 0; d < DIM; d++)
             {
-                xi[i*XI_STRIDE+d] = x[(ci*UNROLLI+i)*X_STRIDE+d] + func_para_shiftvec[ishf+d];
+                //xi[i*XI_STRIDE+d] = x[(ci*UNROLLI+i)*X_STRIDE+d] + func_para_shiftvec[ishf+d];
+#ifdef DEBUG_CACHE
+                if(x[(ci*UNROLLI+i)*X_STRIDE+d] != Cxi_p[i*X_STRIDE+d])
+                {
+                    TLOG("KAAAA! Cache ERR: ci =%d\n", ci);
+                }
+#endif
+                xi[i*XI_STRIDE+d] = Cxi_p[i*X_STRIDE+d] + func_para_shiftvec[ishf+d];
                 fi[i*FI_STRIDE+d] = 0;
             }
 

@@ -59,6 +59,9 @@ struct InitParam
 #define DEBUG_FPEX
 #undef DEBUG_FPEX
 
+#define DEBUG_CACHE
+#undef DEBUG_CACHE
+
 #define SW_NOCACLU
 #undef SW_NOCACLU
 // ----
