@@ -57,6 +57,7 @@ struct InitParam
 #undef DEBUG_SDLB
 
 #define DEBUG_FPEX
+#undef DEBUG_FPEX
 
 #define SW_NOCACLU
 #undef SW_NOCACLU

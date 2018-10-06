@@ -21,8 +21,6 @@ typedef struct {
 } func_para_t;
 
 __thread_local func_para_t device_func_para;
-__thread_local real  ldm_Vvdw = 0;
-__thread_local real  ldm_Vc = 0;
 
 /* Analytical reaction-field kernels */
 //++++++++++++++++++++++++++++++++++++

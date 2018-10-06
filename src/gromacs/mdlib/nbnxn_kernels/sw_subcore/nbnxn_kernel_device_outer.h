@@ -210,6 +210,8 @@ NBK_FUNC_NAME(_VgrpF)
     real  ldm_fshift[SHIFTS*DIM];
 #endif
     real* ldm_f;
+    real  ldm_Vvdw = 0;
+    real  ldm_Vc = 0;
 
     //ldm_f = (real*)malloc(sz_f*sizeof(real));
     /* FIXED: SEEMS NOT ENOUGH MEMORY */
@@ -238,7 +240,6 @@ NBK_FUNC_NAME(_VgrpF)
     memset(ldm_fshift, 0, SHIFTS*DIM*sizeof(real));
 #endif
     //memcpy(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
-    /* FIXED: YOUR PROBLEM!!!!!! */
     sync_get(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
     DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
@@ -452,15 +453,14 @@ NBK_FUNC_NAME(_VgrpF)
     }
 #endif
 #ifdef CALC_ENERGIES
-    sync_put(device_func_para.expand_Vvdw + device_core_id, &ldm_Vvdw, sizeof(real));
-    sync_put(device_func_para.expand_Vc   + device_core_id, &ldm_Vc, sizeof(real));
+    device_func_para.expand_Vvdw[device_core_id] = ldm_Vvdw;
+    device_func_para.expand_Vc  [device_core_id] = ldm_Vc;
 #endif
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 10.\n");
     //wait_host(device_core_id);
 #endif
     DEVICE_CODE_FENCE();
-    device_sync(ARRAY_SCOPE, CORE_SYNC_64);
 #undef IN_F_BLOCK
 }
 

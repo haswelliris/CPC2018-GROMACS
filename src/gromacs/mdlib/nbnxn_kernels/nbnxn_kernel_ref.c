@@ -430,8 +430,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         nbnxn_atomdata_t other_nbat;
         deep_copy_nbat(&other_nbat, nbat, 1, 0);
 
-        rvec *other_shift_vec = (rvec*)malloc(sizeof(rvec));
-        memcpy(other_shift_vec, shift_vec, sizeof(rvec));
+        rvec *other_shift_vec = (rvec*)malloc(SHIFTS*DIM*64*sizeof(real));
+        memcpy(other_shift_vec, shift_vec, SHIFTS*DIM*64*sizeof(real));
 
         real *other_tabq_coul_F = NULL;
         real *other_tabq_coul_V = NULL;
@@ -531,20 +531,22 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             out->Vvdw[0] = expand_Vvdw[63];
             free(expand_Vvdw);
 #ifdef DEBUG_FPEX
-            TLOG("MOee 0.2\n");
-            if(host_param.host_rank == 0)
             {
-                printf("Vc= [");
-                for(i = 0; i < 64; ++i)
+                TLOG("MOee 0.2\n");
+                if(host_param.host_rank == 0)
                 {
-                    printf(" %f", expand_Vc[i]);
+                    printf("Vc= [");
+                    for(i = 0; i < 64; ++i)
+                    {
+                        printf(" %f", expand_Vc[i]);
+                    }
+                    printf("]\n");
+                    wait_device();
                 }
-                printf("]\n");
-                wait_device();
-            }
-            else
-            {
-                wait_device();
+                else
+                {
+                    wait_device();
+                }
             }
 #endif
             // reduce Vc
