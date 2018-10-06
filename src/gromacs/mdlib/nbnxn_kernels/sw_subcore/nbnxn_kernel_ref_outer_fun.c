@@ -7,6 +7,7 @@
 	#define sget_mem(A, B, C) memcpy(A, B, C)
 	#define put_mem(A, B, C) memcpy(A, B, C)
 	#define alloc(A) malloc(A)
+	#define __thread_local ;
 #else
 	#include "SwDevice.h"
 	#define aget_mem(A, B, C) async_get(A, B, C)
@@ -19,98 +20,100 @@
 
 // asign
 
-int 						macro_para;
-nbnxn_pairlist_t			nbl; // 会用到这个结构体里少量值
+__thread_local int 						macro_para;
+__thread_local nbnxn_pairlist_t			nbl; // 会用到这个结构体里少量值
 // nbl.nci = 2000
 // nbl.ncj = 40000
-nbnxn_atomdata_t			nbat; // 会用到这个结构体里比较多的东西
-interaction_const_t			ic; // 用于大量初始化，inner中也有很多使用
-rvec					 	*shift_vec; // 不需要传入，已提取到shiftvec
-real					 	*f; // 会被更改的量，有规约！
+__thread_local nbnxn_atomdata_t			nbat; // 会用到这个结构体里比较多的东西
+__thread_local interaction_const_t		ic; // 用于大量初始化，inner中也有很多使用
+__thread_local rvec					 	*shift_vec; // 不需要传入，已提取到shiftvec
+__thread_local real					 	*f; // 会被更改的量，有规约！
 #define F_LOCAL_SIZE		5000
-real						f_local[F_LOCAL_SIZE];
-real					 	*fshift; // 会被更改的量，有规约！
-real						fshift_local[SHIFTS*DIM];
-real					 	*Vvdw; // 会被更改的量，有规约！
-real						Vvdw_local;
-real					 	*Vc; // 会被更改的量，有规约！
-real						Vc_local;
+__thread_local real						f_local[F_LOCAL_SIZE];
+__thread_local real					 	*fshift; // 会被更改的量，有规约！
+__thread_local real						fshift_local[SHIFTS*DIM];
+__thread_local real					 	*Vvdw; // 会被更改的量，有规约！
+__thread_local real						Vvdw_local;
+__thread_local real					 	*Vc; // 会被更改的量，有规约！
+__thread_local real						Vc_local;
 
-nbnxn_ci_t 					nbln; // 每次迭代值开始初始化，只在从核使用，使用其对象成员
-nbnxn_cj_t 					l_cj; // 局部变量，初始化后在循环内不变，使用数组内容
-const int					*type; // 初始化后在循环内不变，使用其数组内容
-const real					*q; // 初始化后在循环内不变，使用其数组内容
-const real					*shiftvec; // 初始化后在循环内不变，使用其数组内容
-const real					*x; // 初始化后在循环内不变，使用其数组内容
-const real					*nbfp; // 初始化后保持不变，使用其数组内容
-real						rcut2; // 初始化后保持不变
-real						rvdw2; // 初始化后保持不变
-int							ntype2; // 初始化后保持不变
-real						facel; // 初始化后保持不变
-real						*nbfp_i; // 没有用到
-int							n; // 循环变量
-int 						ci; // 每次循环开始初始化
-int 						ci_sh; // 每次循环开始初始化
-int							ish; // 每次循环开始初始化
-int 						ishf; // 每次循环开始初始化
-gmx_bool					do_LJ; // 每次循环开始初始化
-gmx_bool 					half_LJ; // 每次循环开始初始化
-gmx_bool 					do_coul; // 每次循环开始初始化
-gmx_bool 					do_self; // 每次循环开始初始化
-int							cjind0; // 子循环用
-int 						cjind1; // 子循环用
-int 						cjind; // 子循环用
-int							ip; // 好像没用
-int 						jp; // 好像也没用
+__thread_local nbnxn_ci_t 				nbln; // 每次迭代值开始初始化，只在从核使用，使用其对象成员
+__thread_local nbnxn_cj_t 				l_cj; // 局部变量，初始化后在循环内不变，使用数组内容
+__thread_local const int				*type; // 初始化后在循环内不变，使用其数组内容
+__thread_local const real				*q; // 初始化后在循环内不变，使用其数组内容
+__thread_local const real				*shiftvec; // 初始化后在循环内不变，使用其数组内容
+__thread_local const real				*x; // 初始化后在循环内不变，使用其数组内容
+__thread_local const real				*nbfp; // 初始化后保持不变，使用其数组内容
+__thread_local real						rcut2; // 初始化后保持不变
+__thread_local real						rvdw2; // 初始化后保持不变
+__thread_local int						ntype2; // 初始化后保持不变
+__thread_local real						facel; // 初始化后保持不变
+__thread_local real						*nbfp_i; // 没有用到
+__thread_local int						n; // 循环变量
+__thread_local int 						ci; // 每次循环开始初始化
+__thread_local int 						ci_sh; // 每次循环开始初始化
+__thread_local int						ish; // 每次循环开始初始化
+__thread_local int 						ishf; // 每次循环开始初始化
+__thread_local gmx_bool					do_LJ; // 每次循环开始初始化
+__thread_local gmx_bool 				half_LJ; // 每次循环开始初始化
+__thread_local gmx_bool 				do_coul; // 每次循环开始初始化
+__thread_local gmx_bool 				do_self; // 每次循环开始初始化
+__thread_local int						cjind0; // 子循环用
+__thread_local int 						cjind1; // 子循环用
+__thread_local int 						cjind; // 子循环用
+// __thread_local int							ip; // 好像没用
+// __thread_local int 						jp; // 好像也没用
 
-real						xi[UNROLLI*XI_STRIDE]; // 初始化后保持不变，貌似用于暂存
-real						fi[UNROLLI*FI_STRIDE]; // 存放中间结果的变量
-real						qi[UNROLLI]; // 初始化后保持不变
+__thread_local real						xi[UNROLLI*XI_STRIDE]; // 初始化后保持不变，貌似用于暂存
+__thread_local real						fi[UNROLLI*FI_STRIDE]; // 存放中间结果的变量
+__thread_local real						qi[UNROLLI]; // 初始化后保持不变
 
-real	   					Vvdw_ci; // 每次循环开始时清零，最后用于加到规约变量Vvdw中
-real						Vc_ci; // 每次循环开始时清零，最后用于加到规约变量Vc中
+__thread_local real	   					Vvdw_ci; // 每次循环开始时清零，最后用于加到规约变量Vvdw中
+__thread_local real						Vc_ci; // 每次循环开始时清零，最后用于加到规约变量Vc中
 
-int							egp_mask; // 初始化后保持不变
-int							egp_sh_i[UNROLLI]; // 每次循环开始初始化
+__thread_local int						egp_mask; // 初始化后保持不变
+__thread_local int						egp_sh_i[UNROLLI]; // 每次循环开始初始化
 
-real						swV3; // 初始化后保持不变
-real 						swV4; // 初始化后保持不变
-real 						swV5; // 初始化后保持不变
-real						swF2; // 初始化后保持不变
-real 						swF3; // 初始化后保持不变
-real 						swF4; // 初始化后保持不变
+__thread_local real						swV3; // 初始化后保持不变
+__thread_local real 					swV4; // 初始化后保持不变
+__thread_local real 					swV5; // 初始化后保持不变
+__thread_local real						swF2; // 初始化后保持不变
+__thread_local real 					swF3; // 初始化后保持不变
+__thread_local real 					swF4; // 初始化后保持不变
 
-real						lje_coeff2; // 初始化后保持不变
-real 						lje_coeff6_6; // 初始化后保持不变
-real 						lje_vc; // 初始化后保持不变
-const 						real *ljc; // 初始化后保持不变，使用其数组内容 
+__thread_local real						lje_coeff2; // 初始化后保持不变
+__thread_local real 					lje_coeff6_6; // 初始化后保持不变
+__thread_local real 					lje_vc; // 初始化后保持不变
+__thread_local const 					real *ljc; // 初始化后保持不变，使用其数组内容 
 
-real	   					k_rf2; // 初始化后保持不变
+__thread_local real	   					k_rf2; // 初始化后保持不变
 
-real	   					k_rf; // 初始化后保持不变
-real						c_rf; // 初始化后保持不变
+__thread_local real	   					k_rf; // 初始化后保持不变
+__thread_local real						c_rf; // 初始化后保持不变
 
-real						tabscale; // 没有用
+__thread_local real						tabscale; // 没有用
 
-real						halfsp; // 初始化后保持不变
+__thread_local real						halfsp; // 初始化后保持不变
 
 #ifndef GMX_DOUBLE
-	const real 				*tab_coul_FDV0; // 初始化后在循环内不变，使用其数组内容
+	__thread_local const real 			*tab_coul_FDV0; // 初始化后在循环内不变，使用其数组内容
 #else
-	const real 				*tab_coul_F; // 初始化后在循环内不变，使用其数组内容
-	const real 				*tab_coul_V; // 初始化后在循环内不变，使用其数组内容
+	__thread_local const real 			*tab_coul_F; // 初始化后在循环内不变，使用其数组内容
+	__thread_local const real 			*tab_coul_V; // 初始化后在循环内不变，使用其数组内容
 #endif
 
-struct WorkLoadPara workLoadPara;
+__thread_local struct WorkLoadPara workLoadPara;
 
 // 注意上从核这里要加extern
 #ifdef HOST_RUN
 void subcore_func(struct WorkLoadPara *workLoadPara_pass, int device_core_id)
 #else
-void subcore_func()
+void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 #endif
 {
 	sget_mem(&workLoadPara, workLoadPara_pass, sizeof(struct WorkLoadPara));
+
+#ifdef HOST_RUN
 
 	macro_para = workLoadPara.macro_para;
 	// nbl = workLoadPara.nbl;
@@ -408,4 +411,5 @@ void subcore_func()
 	put_mem(workLoadPara.fshift_host + device_core_id*SHIFTS*DIM, fshift_local, sizeof(fshift_local));
 	put_mem(workLoadPara.Vvdw_host+device_core_id, &Vvdw_local, sizeof(real));
 	put_mem(workLoadPara.Vc_host+device_core_id, &Vc_local, sizeof(real));
+	#endif
 }

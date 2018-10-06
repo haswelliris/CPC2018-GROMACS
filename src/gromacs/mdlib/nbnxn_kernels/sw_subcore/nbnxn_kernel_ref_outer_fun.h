@@ -19,7 +19,7 @@
 	#define gmx_invsqrt(x)     (1.0/sqrtf(x))
 #endif
 
-#define HOST_RUN
+// #define HOST_RUN
 
 // end of custom define
 
