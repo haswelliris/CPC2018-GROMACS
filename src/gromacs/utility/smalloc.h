@@ -75,6 +75,9 @@
 
 #include "gromacs/utility/basedefinitions.h"
 
+#define ALL_ALIGNED
+// #undef ALL_ALIGNED
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -189,6 +192,9 @@ void *save_calloc_aligned(const char *name, const char *file, int line,
  * This never fails.
  */
 void save_free_aligned(const char *name, const char *file, int line, void *ptr);
+
+void *save_realloc_aligned(const char *name, const char *file, int line, 
+                          size_t nelem, size_t elsize, size_t alignment);
 
 #ifdef __cplusplus
 }

@@ -122,6 +122,7 @@ void *save_malloc(const char *name, const char *file, int line, size_t size)
 {
     void *p;
 
+#ifndef ALL_ALIGNED
     p = NULL;
     if (size == 0)
     {
@@ -138,6 +139,10 @@ void *save_malloc(const char *name, const char *file, int line, size_t size)
         }
         (void) memset(p, 0, size);
     }
+#else
+    p = save_calloc_aligned(name,file,line,size,(size_t)1,(size_t)4);
+#endif
+
 #ifdef DEBUG
     log_action(1, name, file, line, 1, size, p);
 #endif
@@ -149,6 +154,7 @@ void *save_calloc(const char *name, const char *file, int line,
 {
     void *p;
 
+#ifndef ALL_ALIGNED
     p = NULL;
     if ((nelem == 0) || (elsize == 0))
     {
@@ -189,6 +195,9 @@ void *save_calloc(const char *name, const char *file, int line,
         }
 #endif
     }
+#else
+    p = save_calloc_aligned(name,file,line,(size_t)nelem,(size_t)elsize,(size_t)4);
+#endif
 #ifdef DEBUG
     log_action(1, name, file, line, nelem, elsize, p);
 #endif
@@ -204,7 +213,11 @@ void *save_realloc(const char *name, const char *file, int line, void *ptr,
     p = NULL;
     if (size == 0)
     {
+#ifndef ALL_ALIGNED
         save_free(name, file, line, ptr);
+#else
+        save_free_aligned(name,file,line,ptr);
+#endif
     }
     else
     {
@@ -218,11 +231,21 @@ void *save_realloc(const char *name, const char *file, int line, void *ptr,
 #endif
         if (ptr == NULL)
         {
+#ifndef ALL_ALIGNED
             p = malloc((size_t)size);
+#else
+            p = save_calloc_aligned(name,file,line,(size_t)size,(size_t)1,(size_t)4);
+#endif
         }
         else
         {
+#ifndef ALL_ALIGNED
             p = realloc(ptr, (size_t)size);
+#else
+            // 暂时不管realloc
+            // 赌一赌搏一搏，单车变摩托
+            p = realloc(ptr, (size_t)size);
+#endif
         }
         if (p == NULL)
         {
@@ -245,7 +268,11 @@ void save_free(const char gmx_unused *name, const char gmx_unused *file, int gmx
 #endif
     if (ptr != NULL)
     {
+#ifndef ALL_ALIGNED
         free(ptr);
+#else
+        save_free_aligned(name,file,line,ptr);
+#endif
     }
 }
 
@@ -383,4 +410,8 @@ int over_alloc_dd(int n)
     {
         return n;
     }
+}
+
+void* save_realloc_aligned() {
+
 }
