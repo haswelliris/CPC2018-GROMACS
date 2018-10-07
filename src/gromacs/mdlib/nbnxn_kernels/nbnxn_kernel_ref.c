@@ -398,9 +398,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
     int                vdwt;
     int                nb;
     int                nthreads gmx_unused;
-#ifdef HAHAHAHAHAHAHAHA
-    usleep(200000);
-#endif
+
     nnbl = nbl_list->nnbl;
     nbl  = nbl_list->nbl;
 
@@ -525,6 +523,16 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         // TLOG("tabq_size =%d, ntype =%d, natoms =%d\n", ic->tabq_size, nbat->ntype, nbat->natoms);
 #ifdef DEBUG_SDLB
         TLOG("kaCHI sizeof(nbnxn_pairlist_t) =%d\n", sizeof(nbnxn_pairlist_t));
+#endif
+#ifdef HAHAHAHAHAHAHAHA
+        if(coult == 1)
+        {
+            usleep(120000);
+        }
+        else
+        {
+            usleep(800000);
+        }
 #endif
         if (!(force_flags & GMX_FORCE_ENERGY))
         {
