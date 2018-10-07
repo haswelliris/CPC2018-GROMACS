@@ -15,6 +15,9 @@
 #define XC_LOG2 (4)
 #endif
 
+// ===== CACHE =====
+// -----   x   -----
+
 typedef struct {
     real C[XC_SZ];
     int hd;
@@ -36,15 +39,21 @@ static inline real *xi_C(unsigned int gp_i)
     {
         return &Cxi.C[Coffset*XC_GP];
     }
+    DEVICE_CODE_FENCE();
+    Cxi.hd = Chead;
+#ifndef DEEP_DARK_FANTASY
     if((gp_i+XC_MSK+1) <= Sxi)
     {
         fetch_sz = XC_SZ;
     }
     else
     {
-        fetch_sz = (Sxi-gp_i)*12;
+        fetch_sz = (Sxi-gp_i)*XC_GP;
     }
     sync_get(&Cxi.C[0], Hxi+XC_SZ*Chead, fetch_sz*sizeof(real));
+#else
+    sync_get(&Cxi.C[0], Hxi+XC_SZ*Chead, XC_SZ*sizeof(real));
+#endif
     DEVICE_CODE_FENCE();
     return &Cxi.C[Coffset*XC_GP];
 }
@@ -58,55 +67,124 @@ static inline real *xj_C(unsigned int gp_i)
     {
         return &Cxj.C[Coffset*XC_GP];
     }
+    DEVICE_CODE_FENCE();
+    Cxj.hd = Chead;
+#ifndef DEEP_DARK_FANTASY
     else if((gp_i+XC_MSK+1) <= Sxj)
     {
         fetch_sz = XC_SZ;
     }
     else
     {
-        fetch_sz = (Sxj-gp_i)*12;   
+        fetch_sz = (Sxj-gp_i)*XC_GP;   
     }
-    Cxj.hd = Chead;
     sync_get(&Cxj.C[0], Hxj+XC_SZ*Chead, fetch_sz*sizeof(real));
+#else
+    sync_get(&Cxj.C[0], Hxj+XC_SZ*Chead, XC_SZ*sizeof(real));
+#endif
     DEVICE_CODE_FENCE();
     return &Cxj.C[Coffset*XC_GP];
 }
 
-#define QT_GP   (4)
+#define QC_GP   (4)
 #ifndef GMX_DOUBLE
-#define QT_SZ   (256) //(64*4)
-#define QT_MSK  (63)
-#define QT_LOG2 (6)
+#define QC_SZ   (256) //(64*4)
+#define QC_MSK  (63)
+#define QC_LOG2 (6)
 #else
-#define QT_SZ   (128) //(32*4)
-#define QT_MSK  (31)
-#define QT_LOG2 (5)
+#define QC_SZ   (128) //(32*4)
+#define QC_MSK  (31)
+#define QC_LOG2 (5)
 #endif
 
-typedef struct {
-    real C[QT_SZ];
-    int hd;
-} _qt_cache_t;
+// ===== CACHE =====
+// -----   q   -----
 
-__thread_local _qt_cache_t Cqi; // 1024 B
+typedef struct {
+    real C[QC_SZ];
+    int hd;
+} _q_cache_t;
+
+__thread_local real       *Hqi; 
+__thread_local _q_cache_t  Cqi; // 1024 B
 __thread_local int         Sqi;
-__thread_local _qt_cache_t Cqj; // 1024 B
+__thread_local real       *Hqj; 
+__thread_local _q_cache_t  Cqj; // 1024 B
 __thread_local int         Sqj;
 
-__thread_local _qt_cache_t Cti; // 1024 B
+static inline real *qi_C(unsigned int gp_i)
+{
+    int Coffset = M2_MOD(gp_i,QC_MSK);
+    int Chead   = M2_DIV(gp_i,QC_LOG2);
+    int fetch_sz;
+    if(Chead == Cqi.hd)
+    {
+        return &Cqi.C[Coffset*QC_GP];
+    }
+    DEVICE_CODE_FENCE();
+    Cqi.hd = Chead;
+#ifndef DEEP_DARK_FANTASY
+    if((gp_i+QC_MSK+1) <= Sqi)
+    {
+        fetch_sz = QC_SZ;
+    }
+    else
+    {
+        fetch_sz = (Sqi-gp_i)*QC_GP;
+    }
+    sync_get(&Cqi.C[0], Hqi+QC_SZ*Chead, fetch_sz*sizeof(real));
+#else
+    sync_get(&Cqi.C[0], Hqi+QC_SZ*Chead, QC_SZ*sizeof(real));
+#endif
+    DEVICE_CODE_FENCE();
+    return &Cqi.C[Coffset*QC_GP];
+}
+
+static inline real *qj_C(unsigned int gp_i)
+{
+    int Coffset = M2_MOD(gp_i,QC_MSK);
+    int Chead   = M2_DIV(gp_i,QC_LOG2);
+    int fetch_sz;
+    if(Chead == Cqj.hd)
+    {
+        return &Cqj.C[Coffset*QC_GP];
+    }
+    DEVICE_CODE_FENCE();
+    Cqj.hd = Chead;
+#ifndef DEEP_DARK_FANTASY
+    if((gp_i+QC_MSK+1) <= Sqj)
+    {
+        fetch_sz = QC_SZ;
+    }
+    else
+    {
+        fetch_sz = (Sqj-gp_i)*QC_GP;
+    }
+    sync_get(&Cqj.C[0], Hqj+QC_SZ*Chead, fetch_sz*sizeof(real));
+#else
+    sync_get(&Cqj.C[0], Hqj+QC_SZ*Chead, QC_SZ*sizeof(real));
+#endif
+    DEVICE_CODE_FENCE();
+    return &Cqj.C[Coffset*QC_GP];
+}
+
+#define TC_GP   (4)
+#define TC_SZ   (256) //(64*4)
+#define TC_MSK  (63)
+#define TC_LOG2 (6)
+
+// ===== CACHE =====
+// -----   t   -----
+
+typedef struct {
+    int C[TC_SZ];
+    int hd;
+} _t_cache_t;
+
+__thread_local _t_cache_t  Cti; // 1024 B
 __thread_local int         Sti; 
-__thread_local _qt_cache_t Ctj; // 1024 B
+__thread_local _t_cache_t  Ctj; // 1024 B
 __thread_local int         Stj;
-
-static inline real *qi_C(int idx)
-{
-
-}
-
-static inline real *qj_C(int idx)
-{
-
-}
 
 static inline real *ti_C(int idx)
 {
@@ -127,6 +205,9 @@ typedef struct {
     int hd;
 } _ci_cache_t;
 
+// ===== CACHE =====
+// -----   ci  -----
+
 __thread_local _ci_cache_t Cci; // 1024 B
 __thread_local int         Sci;
 static inline _ci_cache_t *ci_C(int idx)
@@ -142,6 +223,9 @@ typedef struct {
     nbnxn_cj_t C[CJ_SZ];
     int hd;
 } _cj_cache_t;
+
+// ===== CACHE =====
+// -----   cj  -----
 
 __thread_local int           Scj; // 1024 B
 __thread_local _cj_cache_t   Ccj;
@@ -160,6 +244,9 @@ static inline _cj_cache_t *cj_C(int idx)
 #define NF_MSK  (63)
 #define NF_LOG2 (6)
 #endif
+
+// ===== CACHE =====
+// -----  nbfp -----
 
 typedef struct {
     real C[NF_SZ];

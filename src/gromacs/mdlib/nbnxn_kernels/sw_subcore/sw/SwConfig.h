@@ -62,6 +62,8 @@ struct InitParam
 #define DEBUG_CACHE
 #undef DEBUG_CACHE
 
+#define DEEP_DARK_FANTASY
+
 #define SW_NOCACLU
 #undef SW_NOCACLU
 // ----

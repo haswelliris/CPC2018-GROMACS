@@ -103,7 +103,7 @@ NBK_FUNC_NAME(_VgrpF)
     nbnxn_cj_t   *l_cj;
     int          *type;
     real         *q;
-    real         *func_para_shiftvec;
+    real          func_para_shiftvec[SHIFTS*DIM];
     real         *x;
     real         *nbfp;
     real                rcut2;
@@ -182,7 +182,7 @@ NBK_FUNC_NAME(_VgrpF)
     q                   = device_func_para.nbat->q;
     type                = device_func_para.nbat->type;
     facel               = device_func_para.ic->epsfac;
-    func_para_shiftvec            = device_func_para.shift_vec[0];
+    //func_para_shiftvec            = device_func_para.shift_vec[0];
     x                   = device_func_para.nbat->x;
 
     l_cj = device_func_para.nbl->cj;
@@ -209,12 +209,19 @@ NBK_FUNC_NAME(_VgrpF)
     // ===== INIT CACHE ===== 
     real *Cxi_p;
     real *Cxj_p;
+    real *Cqi_p;
+    real *Cqj_p;
     {
         clear_C();
         Hxi = x;
         Sxi = sizeof_f_div_12;
         Hxj = x;
         Sxj = sizeof_f_div_12;
+
+        Hqi = q;
+        Sqi = natoms >> 2;
+        Hqj = q;
+        Sqj = natoms >> 2;
     }
     // ===== INIT CACHE =====
 
@@ -248,7 +255,7 @@ NBK_FUNC_NAME(_VgrpF)
     TLOG("kaCHI 3.1.\n");
     //wait_host(device_core_id);
 #endif
-
+    sync_get(&func_para_shiftvec[0], device_func_para.shift_vec[0], SHIFTS*DIM*sizeof(real));
 #ifdef CALC_SHIFTFORCES /* Always*/
     memset(ldm_fshift, 0, SHIFTS*DIM*sizeof(real));
 #endif
@@ -315,6 +322,7 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
         //TODO: ldm load: x, q， func_para_shiftvec
         Cxi_p = xi_C(ci);
+        Cqi_p = qi_C(ci);
         for (i = 0; i < UNROLLI; i++)
         {
             for (d = 0; d < DIM; d++)
@@ -330,7 +338,8 @@ NBK_FUNC_NAME(_VgrpF)
                 fi[i*FI_STRIDE+d] = 0;
             }
 
-            qi[i] = facel*q[ci*UNROLLI+i];
+            //qi[i] = facel*q[ci*UNROLLI+i];
+            qi[i] = facel*Cqi_p[i];
         }
         DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
@@ -359,7 +368,8 @@ NBK_FUNC_NAME(_VgrpF)
                 {
                     //TODO: REDUCE SUM
                     /* Coulomb self interaction */
-                    ldm_Vc   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+                    //ldm_Vc   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+                    ldm_Vc   -= qi[i]*Cqi_p[i]*Vc_sub_self;
                 }
             }
         }

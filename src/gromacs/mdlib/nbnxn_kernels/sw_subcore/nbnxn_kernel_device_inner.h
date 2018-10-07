@@ -49,7 +49,7 @@
     cj               = l_cj[cjind].cj;
     write_cj         = IN_F_BLOCK(cj);
     Cxj_p = xj_C(cj);
-
+    Cqj_p = qj_C(cj);
     if(write_ci || write_cj)
     {
 
@@ -230,7 +230,8 @@
              * to the force and potential, and the easiest way
              * to do this is to zero the charges in
              * advance. */
-            qq = skipmask * qi[i] * q[aj];
+            //qq = skipmask * qi[i] * q[aj];
+            qq = skipmask * qi[i] * Cqj_p[j];
 
 #ifdef CALC_COUL_RF
             fcoul  = qq*(interact*rinv*rinvsq - k_rf2);
