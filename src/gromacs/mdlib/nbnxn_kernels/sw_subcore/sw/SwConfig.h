@@ -62,10 +62,17 @@ struct InitParam
 #define DEBUG_CACHE
 #undef DEBUG_CACHE
 
+//---------------------DEEP_DARK_FANTASY----------------------------
+//open this to avoid memory boundary check, maybe cause MEMORY ACCESS ERROR
 #define DEEP_DARK_FANTASY
+//---------------------DEEP_DARK_FANTASY----------------------------
+
+#define COUNT_CACHE_HITS
+#undef COUNT_CACHE_HITS
+
+// ----
 
 #define SW_NOCACLU
 #undef SW_NOCACLU
-// ----
 
 #endif

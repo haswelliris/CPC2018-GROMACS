@@ -49,6 +49,8 @@
     cj               = l_cj[cjind].cj;
     write_cj         = IN_F_BLOCK(cj);
 
+
+
     if(write_ci || write_cj)
     {
 
@@ -64,8 +66,10 @@
         ai = ci*UNROLLI + i;
 
         //TODO: ldm load: type
+
         //type_i_off = type[ai]*ntype2;
         type_i_off = Cti_p[i]*ntype2;
+
 
         for (j = 0; j < UNROLLJ; j++)
         {
@@ -181,6 +185,7 @@
 #endif
             {
                 //TODO: ldm load: nbfp
+
                 //c6      = nbfp[type_i_off+type[aj]*2  ];
                 //c12     = nbfp[type_i_off+type[aj]*2+1];
                 /* SAMPLE 1:  NTYPE = 39, 39*2 is the MIN fetch size */
@@ -188,6 +193,7 @@
                 /* OUR CACHE SIZE =  39*2*12*sizeof(int) = 3744 Byte */
                 c6      = nbfp[type_i_off+Ctj_p[j]*2  ];
                 c12     = nbfp[type_i_off+Ctj_p[j]*2+1];
+
 
 #if defined LJ_CUT
                 rinvsix = interact*rinvsq*rinvsq*rinvsq;
@@ -238,8 +244,10 @@
              * to the force and potential, and the easiest way
              * to do this is to zero the charges in
              * advance. */
+
             //qq = skipmask * qi[i] * q[aj];
             qq = skipmask * qi[i] * Cqj_p[j];
+
 
 #ifdef CALC_COUL_RF
             fcoul  = qq*(interact*rinv*rinvsq - k_rf2);
