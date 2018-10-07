@@ -171,15 +171,23 @@ NBK_FUNC_NAME(_VgrpF)
     tabscale = ic.tabq_scale;
 #ifdef CALC_ENERGIES
     halfsp = 0.5/ic.tabq_scale;
-#endif
+#endif // CALC_ENERGIES
 
 #ifndef GMX_DOUBLE
-    tab_coul_FDV0 = device_func_para.tabq_coul_FDV0;
+    //tab_coul_FDV0 = device_func_para.tabq_coul_FDV0;
+    void *unaligned_FDV0 = device_malloc((ic.tabq_size*4+DEVICE_SAFE_PAD)*sizeof(real));
+    if(unaligned_FDV0 == NULL)
+    {
+        ALOG("Not enough MEM.\n");
+        return;
+    }
+    tab_coul_FDV0 = (real*)device_align(unaligned_FDV0, 64, 0);
+    async_get(tab_coul_FDV0, device_func_para.tabq_coul_FDV0, ic.tabq_size*4*sizeof(real));
 #else
     tab_coul_F    = device_func_para.tabq_coul_F;
     tab_coul_V    = device_func_para.tabq_coul_V;
-#endif
-#endif
+#endif // GMX_DOUBLE
+#endif // CALC_COUL_TAB
 
 
     rcut2               = ic.rcoulomb*ic.rcoulomb;
@@ -273,12 +281,14 @@ NBK_FUNC_NAME(_VgrpF)
     TLOG("kaCHI 3.1.\n");
     //wait_host(device_core_id);
 #endif
-    sync_get(&func_para_shiftvec[0], device_func_para.shift_vec[0], SHIFTS*DIM*sizeof(real));
+    //memcpy(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    async_get(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    async_get(&func_para_shiftvec[0], device_func_para.shift_vec[0], SHIFTS*DIM*sizeof(real));
+
 #ifdef CALC_SHIFTFORCES /* Always*/
     memset(ldm_fshift, 0, SHIFTS*DIM*sizeof(real));
 #endif
-    //memcpy(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
-    sync_get(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    wait_all_async_get();
     DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 4.\n");
@@ -491,10 +501,9 @@ NBK_FUNC_NAME(_VgrpF)
     DEVICE_CODE_FENCE();
 #endif /* SW_NOCACLU */
     //memcpy(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
-    sync_put(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
-    //free(ldm_f);
+    async_put(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
     DEVICE_CODE_FENCE();
-    device_free(unaligned_ldm_f, (sz_f+DEVICE_SAFE_PAD)*sizeof(real));
+
 #ifdef CALC_SHIFTFORCES
     if (device_func_para.expand_fshift != NULL)
     {
@@ -506,11 +515,24 @@ NBK_FUNC_NAME(_VgrpF)
     device_func_para.expand_Vvdw[device_core_id] = ldm_Vvdw;
     device_func_para.expand_Vc  [device_core_id] = ldm_Vc;
 #endif
+
+#ifdef CALC_COUL_TAB
+#ifndef GMX_DOUBLE
+    device_free(unaligned_FDV0, (ic.tabq_size*4+DEVICE_SAFE_PAD)*sizeof(real));
+#else
+#endif // GMX_DOUBLE
+#endif // CALC_COUL_TAB
+
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 10.\n");
     //wait_host(device_core_id);
 #endif
     DEVICE_CODE_FENCE();
+#ifdef CALC_SHIFTFORCES
+    wait_all_async_put();
+#endif
+    //free(ldm_f);
+    device_free(unaligned_ldm_f, (sz_f+DEVICE_SAFE_PAD)*sizeof(real));
 #undef IN_F_BLOCK
 }
 

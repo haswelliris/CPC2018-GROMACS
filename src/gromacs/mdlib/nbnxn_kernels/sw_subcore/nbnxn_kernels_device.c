@@ -308,6 +308,35 @@ static inline real *nf_C(int idx)
 
 }
 
+/*//
+#ifndef GMX_DOUBLE
+#define FD_GP   (4) // FDV0
+#define FD_SZ   (512) //(128*4)
+#define FD_MSK  (127)
+#define FD_LOG2 (7)
+#else
+#define FD_GP   (1) // F, V
+#define FD_SZ   (128) //(128*1)
+#define FD_MSK  (127)
+#define FD_LOG2 (7)
+#endif
+#define FD_NC   (4)
+#define FD_NC_L2(2)
+
+typedef struct {
+    real C[FD_NC][FD_SZ];
+    real C0[FD_GP];        // HIT 0 very often
+    int hd;
+} _fd_cache_t;
+
+#ifndef GMX_DOUBLE
+__thread_local _fd_cache_t Cfdv0; // 8192 Byte
+#else
+__thread_local _fd_cache_t Cf; // 4096 Byte
+__thread_local _fd_cache_t Cv; // 4096 Byte
+#endif
+/**/
+
 static inline void clear_C()
 {
    Cxi.hd = -1;

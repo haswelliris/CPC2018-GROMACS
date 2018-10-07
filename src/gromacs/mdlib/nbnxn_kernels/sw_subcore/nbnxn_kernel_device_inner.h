@@ -183,6 +183,9 @@
                 //TODO: ldm load: nbfp
                 //c6      = nbfp[type_i_off+type[aj]*2  ];
                 //c12     = nbfp[type_i_off+type[aj]*2+1];
+                /* SAMPLE 1:  NTYPE = 39, 39*2 is the MIN fetch size */
+                /* SAMPLE 2:  NTYPE = 12, 12*2 is the MIN fetch size */
+                /* OUR CACHE SIZE =  39*2*12*sizeof(int) = 3744 Byte */
                 c6      = nbfp[type_i_off+Ctj_p[j]*2  ];
                 c12     = nbfp[type_i_off+Ctj_p[j]*2+1];
 
@@ -251,17 +254,30 @@
             DEVICE_CODE_FENCE();
 #ifdef DEBUG_FPEX
             TLOG("rsq =%f, tabq_scale =%f\n", rsq, ic.tabq_scale);
-#endif
+#endif //DEBUG_FPEX
             rs     = rsq*rinv*ic.tabq_scale;
             ri     = (int)rs;
             frac   = rs - ri;
 #ifndef GMX_DOUBLE
             /* fexcl = F_i + frac * (F_(i+1)-F_i) */
+            // ri =(int)(dx^2+dy^2+dz^2) / sqrt(dx^2+dy^2+dz^2) * ic.tabq_scale
+            // (int)(dx^2+dy^2+dz^2) / sqrt(dx^2+dy^2+dz^2) = [0, +inf]??
+            // SAMPLE1 tabq_scale=1071
+            // SAMPLE2 WILL NOT INTO CALC_COUL_TAB
+            // RI =[0,tabq_scale]
+            // RI*4 =[0,tabq_scale*4]  =  [0, 4300]
+            // 4500 * sizeof(real) = 17200 Byte
+            // SAMPLE sizeof(tab_coul_FDV0) = 17168 Byte
+            // like a shit! cache miss is very often!!!!
+            //
+            // Lets's LOAD all of it to LDM???? 17KB is acceptable
+            // TLOG("RI =%d\t tabq_scale =%f\n", ri, ic.tabq_scale);
             fexcl  = tab_coul_FDV0[ri*4] + frac*tab_coul_FDV0[ri*4+1];
+            //fexcl  = (1 - frac)*tab_coul_FDV0[ri*2] + frac*tab_coul_FDV0[(ri+1)*2];
 #else
             /* fexcl = (1-frac) * F_i + frac * F_(i+1) */
             fexcl  = (1 - frac)*tab_coul_F[ri] + frac*tab_coul_F[ri+1];
-#endif
+#endif // GMX_DOUBLE
             fcoul  = interact*rinvsq - fexcl;
             /* 7 flops for float 1/r-table force */
 #ifdef CALC_ENERGIES
@@ -270,28 +286,31 @@
             //TODO: ldm load: tab_coul_FDV0, tab_coul_V, tab_coul_F
 #ifdef DEBUG_FPEX
             TLOG("qq =%f, rinv =%f, interact =%f, sh_ewald =%f, halfsp =%f, frac =%f, fexcl =%f\n", qq, Vc_ci, interact, ic.sh_ewald, halfsp, frac, fexcl);
-#endif
+#endif // DEBUG_FPEX
             vcoul  = qq*(interact*(rinv - ic.sh_ewald)
                          -(tab_coul_FDV0[ri*4+2]
                            -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
+            // vcoul  = qq*(interact*(rinv - ic.sh_ewald)
+            //              -(tab_coul_FDV0[ri*2+1]
+            //                -halfsp*frac*(tab_coul_FDV0[ri*2] + fexcl)));
             /* 7 flops for float 1/r-table energy (8 with excls) */
 #else
             vcoul  = qq*(interact*(rinv - ic.sh_ewald)
                          -(tab_coul_V[ri]
                            -halfsp*frac*(tab_coul_F[ri] + fexcl)));
-#endif
-#endif
+#endif // GMX_DOUBLE
+#endif // CALC_ENERGIES
             fcoul *= qq*rinv;
-#endif
+#endif // CALC_ENERGIES
             DEVICE_CODE_FENCE();
 #ifdef CALC_ENERGIES
 #ifdef DEBUG_FPEX
             TLOG("Vc_ci =%f, vcoul =%f\n", Vc_ci, vcoul);
-#endif
+#endif // DEBUG_FPEX
             Vc_ci += vcoul;
             /* 1 flop for Coulomb energy addition */
-#endif
-#endif
+#endif // CALC_ENERGIES
+#endif // CALC_COUL_TAB
 
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.2.2.\n");

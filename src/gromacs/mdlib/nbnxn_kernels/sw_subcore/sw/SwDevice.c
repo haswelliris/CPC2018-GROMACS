@@ -117,6 +117,14 @@ void sync_get(void* d_ptr, void* h_ptr, int size)
     while (sync_get_reply != 1);
 }
 
+// DONT USE THIS
+void sync_get_stride(void* d_ptr, void* h_ptr, int size, int stride)
+{
+    sync_get_reply = 0;
+    athread_get(PE_MODE, h_ptr, d_ptr, size, (void*)(&sync_get_reply), 0, stride, 0);
+    while (sync_get_reply != 1);
+}
+
 void async_put(void* h_ptr, void* d_ptr, int size)
 {
     athread_put(PE_MODE, d_ptr, h_ptr, size, (void*)(&async_put_reply), 0, 0);
@@ -131,6 +139,13 @@ void wait_all_async_put()
 void async_get(void* d_ptr, void* h_ptr, int size)
 {
     athread_get(PE_MODE, h_ptr, d_ptr, size, (void*)(&async_get_reply), 0, 0, 0);
+    async_get_reply_counter++;
+}
+
+// DONT USE THIS
+void async_get_stride(void* d_ptr, void* h_ptr, int size, int stride)
+{
+    athread_get(PE_MODE, h_ptr, d_ptr, size, (void*)(&async_get_reply), 0, stride, 0);
     async_get_reply_counter++;
 }
 
