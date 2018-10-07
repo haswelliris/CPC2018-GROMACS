@@ -349,7 +349,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
     int                vdwt;
     int                nb;
     int                nthreads gmx_unused;
-
+#ifdef HAHAHAHAHAHAHAHA
+    usleep(200000);
+#endif
     nnbl = nbl_list->nnbl;
     nbl  = nbl_list->nbl;
 

@@ -70,9 +70,10 @@ struct InitParam
 #define COUNT_CACHE_HITS
 #undef COUNT_CACHE_HITS
 
-// ----
-
 #define SW_NOCACLU
 #undef SW_NOCACLU
+
+#define HAHAHAHAHAHAHAHA
+// ----
 
 #endif
