@@ -48,13 +48,15 @@
     //TODO: ldm load: l_cj
     cj               = l_cj[cjind].cj;
     write_cj         = IN_F_BLOCK(cj);
-    Cxj_p = xj_C(cj);
-    Cqj_p = qj_C(cj);
-    // type 上爆了。。。。
-    // Ctj_p = tj_C(cj);
+
+
+
     if(write_ci || write_cj)
     {
 
+    Cxj_p = xj_C(cj);
+    Cqj_p = qj_C(cj);
+    Ctj_p = tj_C(cj);
     for (i = 0; i < UNROLLI; i++)
     {
         int ai;
@@ -64,14 +66,10 @@
         ai = ci*UNROLLI + i;
 
         //TODO: ldm load: type
-    // type 上爆了。。。。
-// #ifdef DEBUG_CACHE
-//         if(type[ai] != Cti_p[i])
-//         {
-//             TLOG("KAAAA! Cache ERR: ci =%d\n", ci);
-//         }
-// #endif
-        type_i_off = type[ai]*ntype2;
+
+        //type_i_off = type[ai]*ntype2;
+        type_i_off = Cti_p[i]*ntype2;
+
 
         for (j = 0; j < UNROLLJ; j++)
         {
@@ -187,15 +185,15 @@
 #endif
             {
                 //TODO: ldm load: nbfp
-    // type 上爆了。。。。
-// #ifdef DEBUG_CACHE
-//                 if(type[aj] != Ctj_p[j])
-//                 {
-//                     TLOG("KAAAA! Cache ERR: type: wanted: %d bug got: %d\n", type[aj], Ctj_p[j]);
-//                 }
-// #endif
-                c6      = nbfp[type_i_off+type[aj]*2  ];
-                c12     = nbfp[type_i_off+type[aj]*2+1];
+
+                //c6      = nbfp[type_i_off+type[aj]*2  ];
+                //c12     = nbfp[type_i_off+type[aj]*2+1];
+                /* SAMPLE 1:  NTYPE = 39, 39*2 is the MIN fetch size */
+                /* SAMPLE 2:  NTYPE = 12, 12*2 is the MIN fetch size */
+                /* OUR CACHE SIZE =  39*2*12*sizeof(int) = 3744 Byte */
+                c6      = nbfp[type_i_off+Ctj_p[j]*2  ];
+                c12     = nbfp[type_i_off+Ctj_p[j]*2+1];
+
 
 #if defined LJ_CUT
                 rinvsix = interact*rinvsq*rinvsq*rinvsq;
@@ -204,8 +202,8 @@
                 frLJ    = FrLJ12 - FrLJ6;
                 /* 7 flops for r^-2 + LJ force */
 #if defined CALC_ENERGIES
-                VLJ     = (FrLJ12 + c12*device_func_para.ic->repulsion_shift.cpot)/12 -
-                    (FrLJ6 + c6*device_func_para.ic->dispersion_shift.cpot)/6;
+                VLJ     = (FrLJ12 + c12*cpot)/12 -
+                    (FrLJ6 + c6*cpot)/6;
                 /* 7 flops for LJ energy */
 #endif
 #endif
@@ -246,14 +244,11 @@
              * to the force and potential, and the easiest way
              * to do this is to zero the charges in
              * advance. */
-#ifdef DEBUG_CACHE
-            if(q[aj] != Cqj_p[j])
-            {
-                TLOG("KAAAA! Cache ERR: cj =%d\n", cj);
-            }
-#endif
-            // qq = skipmask * qi[i] * q[aj];
+
+            //qq = skipmask * qi[i] * q[aj];
             qq = skipmask * qi[i] * Cqj_p[j];
+
+
 #ifdef CALC_COUL_RF
             fcoul  = qq*(interact*rinv*rinvsq - k_rf2);
             /* 4 flops for RF force */
@@ -266,18 +261,31 @@
 #ifdef CALC_COUL_TAB
             DEVICE_CODE_FENCE();
 #ifdef DEBUG_FPEX
-            TLOG("rsq =%f, tabq_scale =%f\n", rsq, device_func_para.ic->tabq_scale);
-#endif
-            rs     = rsq*rinv*device_func_para.ic->tabq_scale;
+            TLOG("rsq =%f, tabq_scale =%f\n", rsq, ic.tabq_scale);
+#endif //DEBUG_FPEX
+            rs     = rsq*rinv*ic.tabq_scale;
             ri     = (int)rs;
             frac   = rs - ri;
 #ifndef GMX_DOUBLE
             /* fexcl = F_i + frac * (F_(i+1)-F_i) */
+            // ri =(int)(dx^2+dy^2+dz^2) / sqrt(dx^2+dy^2+dz^2) * ic.tabq_scale
+            // (int)(dx^2+dy^2+dz^2) / sqrt(dx^2+dy^2+dz^2) = [0, +inf]??
+            // SAMPLE1 tabq_scale=1071
+            // SAMPLE2 WILL NOT INTO CALC_COUL_TAB
+            // RI =[0,tabq_scale]
+            // RI*4 =[0,tabq_scale*4]  =  [0, 4300]
+            // 4500 * sizeof(real) = 17200 Byte
+            // SAMPLE sizeof(tab_coul_FDV0) = 17168 Byte
+            // like a shit! cache miss is very often!!!!
+            //
+            // Lets's LOAD all of it to LDM???? 17KB is acceptable
+            // TLOG("RI =%d\t tabq_scale =%f\n", ri, ic.tabq_scale);
             fexcl  = tab_coul_FDV0[ri*4] + frac*tab_coul_FDV0[ri*4+1];
+            //fexcl  = (1 - frac)*tab_coul_FDV0[ri*2] + frac*tab_coul_FDV0[(ri+1)*2];
 #else
             /* fexcl = (1-frac) * F_i + frac * F_(i+1) */
             fexcl  = (1 - frac)*tab_coul_F[ri] + frac*tab_coul_F[ri+1];
-#endif
+#endif // GMX_DOUBLE
             fcoul  = interact*rinvsq - fexcl;
             /* 7 flops for float 1/r-table force */
 #ifdef CALC_ENERGIES
@@ -285,29 +293,32 @@
 #ifndef GMX_DOUBLE
             //TODO: ldm load: tab_coul_FDV0, tab_coul_V, tab_coul_F
 #ifdef DEBUG_FPEX
-            TLOG("qq =%f, rinv =%f, interact =%f, sh_ewald =%f, halfsp =%f, frac =%f, fexcl =%f\n", qq, Vc_ci, interact, device_func_para.ic->sh_ewald, halfsp, frac, fexcl);
-#endif
-            vcoul  = qq*(interact*(rinv - device_func_para.ic->sh_ewald)
+            TLOG("qq =%f, rinv =%f, interact =%f, sh_ewald =%f, halfsp =%f, frac =%f, fexcl =%f\n", qq, Vc_ci, interact, ic.sh_ewald, halfsp, frac, fexcl);
+#endif // DEBUG_FPEX
+            vcoul  = qq*(interact*(rinv - ic.sh_ewald)
                          -(tab_coul_FDV0[ri*4+2]
                            -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
+            // vcoul  = qq*(interact*(rinv - ic.sh_ewald)
+            //              -(tab_coul_FDV0[ri*2+1]
+            //                -halfsp*frac*(tab_coul_FDV0[ri*2] + fexcl)));
             /* 7 flops for float 1/r-table energy (8 with excls) */
 #else
-            vcoul  = qq*(interact*(rinv - device_func_para.ic->sh_ewald)
+            vcoul  = qq*(interact*(rinv - ic.sh_ewald)
                          -(tab_coul_V[ri]
                            -halfsp*frac*(tab_coul_F[ri] + fexcl)));
-#endif
-#endif
+#endif // GMX_DOUBLE
+#endif // CALC_ENERGIES
             fcoul *= qq*rinv;
-#endif
+#endif // CALC_ENERGIES
             DEVICE_CODE_FENCE();
 #ifdef CALC_ENERGIES
 #ifdef DEBUG_FPEX
             TLOG("Vc_ci =%f, vcoul =%f\n", Vc_ci, vcoul);
-#endif
+#endif // DEBUG_FPEX
             Vc_ci += vcoul;
             /* 1 flop for Coulomb energy addition */
-#endif
-#endif
+#endif // CALC_ENERGIES
+#endif // CALC_COUL_TAB
 
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.2.2.\n");

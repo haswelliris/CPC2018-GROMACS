@@ -298,7 +298,22 @@ void deep_copy_nbat(nbnxn_atomdata_t *dst, nbnxn_atomdata_t *src, int new_dst, i
         dst->q = (real*)malloc(src->natoms*sizeof(real));
         dst->nbfp = (real*)malloc(src->ntype*src->ntype*2*sizeof(real));
         dst->type = (int*)malloc(src->natoms*sizeof(int));
-
+        // if the nbfp can load to LDM?
+        // TLOG("nbfpSZ =%d Byte\n", src->ntype*src->ntype*2*sizeof(real));
+        // watch VAR of type
+        // int i;
+        // TLOG("type = [ ");
+        // for(i = 0; i < src->natoms; ++i)
+        // {
+        //     if(host_param.host_rank == 0)
+        //     {
+        //         printf(" %d,", src->type[i]);
+        //     }
+        // }
+        // if(host_param.host_rank == 0)
+        // {
+        //         printf(" ]\n");
+        // }
         dst->natoms = src->natoms;
         dst->ntype = src->ntype;
         dst->xstride = src->xstride;
@@ -446,7 +461,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         memcpy(other_tabq_coul_F, ic->tabq_coul_F, ic->tabq_size*sizeof(real));
         memcpy(other_tabq_coul_V, ic->tabq_coul_V, ic->tabq_size*sizeof(real));
 #endif
-        //TLOG("tabq_size =%d, ntype =%d, natoms =%d\n", ic->tabq_size, nbat->ntype, nbat->natoms);
+        // if the tabq_coul_FDV0 can load to LDM?
+        // TLOG("tabq_coul_FDV0_SZ =%d Byte\n", ic->tabq_size*4*sizeof(real));
+        // TLOG("tabq_size =%d, ntype =%d, natoms =%d\n", ic->tabq_size, nbat->ntype, nbat->natoms);
 #ifdef DEBUG_SDLB
         TLOG("kaCHI sizeof(nbnxn_pairlist_t) =%d\n", sizeof(nbnxn_pairlist_t));
 #endif

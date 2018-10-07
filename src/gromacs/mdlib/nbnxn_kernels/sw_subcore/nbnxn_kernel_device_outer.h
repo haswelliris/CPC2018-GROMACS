@@ -36,7 +36,7 @@
 #define UNROLLI    NBNXN_CPU_CLUSTER_I_SIZE
 #define UNROLLJ    NBNXN_CPU_CLUSTER_I_SIZE
 
-/* We could use device_func_para.nbat->xstride and device_func_para.nbat->fstride, but macros might be faster */
+/* We could use nbat.xstride and nbat.fstride, but macros might be faster */
 #define X_STRIDE   3
 #define F_STRIDE   3
 /* Local i-atom buffer strides */
@@ -103,7 +103,7 @@ NBK_FUNC_NAME(_VgrpF)
     nbnxn_cj_t   *l_cj;
     int          *type;
     real         *q;
-    real         *func_para_shiftvec;
+    real          func_para_shiftvec[SHIFTS*DIM];
     real         *x;
     real         *nbfp;
     real                rcut2;
@@ -150,42 +150,59 @@ NBK_FUNC_NAME(_VgrpF)
     //wait_host(device_core_id);
 #endif
 
+    nbnxn_pairlist_t     nbl;
+    nbnxn_atomdata_t     nbat;
+    interaction_const_t  ic;
+    async_get(&nbl, device_func_para.nbl, sizeof(nbnxn_pairlist_t));
+    async_get(&nbat, device_func_para.nbat, sizeof(nbnxn_atomdata_t));
+    async_get(&ic, device_func_para.ic, sizeof(interaction_const_t));
+    wait_all_async_get();
+
     // =========== INIT DATA =============
+    real cpot = ic.repulsion_shift.cpot;
 #ifdef CALC_COUL_RF
-    k_rf2 = 2*device_func_para.ic->k_rf;
+    k_rf2 = 2*ic.k_rf;
 #ifdef CALC_ENERGIES
-    k_rf = device_func_para.ic->k_rf;
-    c_rf = device_func_para.ic->c_rf;
+    k_rf = ic.k_rf;
+    c_rf = ic.c_rf;
 #endif
 #endif
 #ifdef CALC_COUL_TAB
-    tabscale = device_func_para.ic->tabq_scale;
+    tabscale = ic.tabq_scale;
 #ifdef CALC_ENERGIES
-    halfsp = 0.5/device_func_para.ic->tabq_scale;
-#endif
+    halfsp = 0.5/ic.tabq_scale;
+#endif // CALC_ENERGIES
 
 #ifndef GMX_DOUBLE
-    tab_coul_FDV0 = device_func_para.tabq_coul_FDV0;
+    //tab_coul_FDV0 = device_func_para.tabq_coul_FDV0;
+    void *unaligned_FDV0 = device_malloc((ic.tabq_size*4+DEVICE_SAFE_PAD)*sizeof(real));
+    if(unaligned_FDV0 == NULL)
+    {
+        ALOG("Not enough MEM.\n");
+        return;
+    }
+    tab_coul_FDV0 = (real*)device_align(unaligned_FDV0, 64, 0);
+    async_get(tab_coul_FDV0, device_func_para.tabq_coul_FDV0, ic.tabq_size*4*sizeof(real));
 #else
     tab_coul_F    = device_func_para.tabq_coul_F;
     tab_coul_V    = device_func_para.tabq_coul_V;
-#endif
-#endif
+#endif // GMX_DOUBLE
+#endif // CALC_COUL_TAB
 
 
-    rcut2               = device_func_para.ic->rcoulomb*device_func_para.ic->rcoulomb;
+    rcut2               = ic.rcoulomb*ic.rcoulomb;
 #ifdef DEBUG_FPEX
-            TLOG("rcoulomb =%f, rcut2 =%f\n", device_func_para.ic->rcoulomb, rcut2);
+            TLOG("rcoulomb =%f, rcut2 =%f\n", ic.rcoulomb, rcut2);
 #endif
-    ntype2              = device_func_para.nbat->ntype*2;
-    nbfp                = device_func_para.nbat->nbfp;
-    q                   = device_func_para.nbat->q;
-    type                = device_func_para.nbat->type;
-    facel               = device_func_para.ic->epsfac;
-    func_para_shiftvec            = device_func_para.shift_vec[0];
-    x                   = device_func_para.nbat->x;
+    ntype2              = nbat.ntype*2;
+    nbfp                = nbat.nbfp;
+    q                   = nbat.q;
+    type                = nbat.type;
+    facel               = ic.epsfac;
+    //func_para_shiftvec            = device_func_para.shift_vec[0];
+    x                   = nbat.x;
 
-    l_cj = device_func_para.nbl->cj;
+    l_cj = nbl.cj;
     // =========== INIT DATA =============
     DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
@@ -193,8 +210,8 @@ NBK_FUNC_NAME(_VgrpF)
     //wait_host(device_core_id);
 #endif
 
-    int natoms = device_func_para.nbat->natoms;
-    int fstride = device_func_para.nbat->fstride;
+    int natoms = nbat.natoms;
+    int fstride = nbat.fstride;
     int sizeof_f = natoms*fstride;
     int sizeof_f_div_12 = sizeof_f/12;
     int sizeof_fshift = SHIFTS*DIM; // 135 * sizeof(float)
@@ -209,8 +226,11 @@ NBK_FUNC_NAME(_VgrpF)
     // ===== INIT CACHE ===== 
     real *Cxi_p;
     real *Cxj_p;
+
     real *Cqi_p;
     real *Cqj_p;
+
+
     int  *Cti_p;
     int  *Ctj_p;
     {
@@ -220,15 +240,16 @@ NBK_FUNC_NAME(_VgrpF)
         Hxj = x;
         Sxj = sizeof_f_div_12;
 
-        // 暂时不管q的大小了
-        // Sqi = 
+
         Hqi = q;
+        Sqi = natoms >> 2;
         Hqj = q;
+        Sqj = natoms >> 2;
 
-        // t is type ?
         Hti = type;
+        Sti = natoms >> 2;
         Htj = type;
-
+        Stj = natoms >> 2;
 
     }
     // ===== INIT CACHE =====
@@ -263,12 +284,14 @@ NBK_FUNC_NAME(_VgrpF)
     TLOG("kaCHI 3.1.\n");
     //wait_host(device_core_id);
 #endif
+    //memcpy(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    async_get(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    async_get(&func_para_shiftvec[0], device_func_para.shift_vec[0], SHIFTS*DIM*sizeof(real));
 
 #ifdef CALC_SHIFTFORCES /* Always*/
     memset(ldm_fshift, 0, SHIFTS*DIM*sizeof(real));
 #endif
-    //memcpy(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
-    sync_get(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    wait_all_async_get();
     DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 4.\n");
@@ -277,18 +300,18 @@ NBK_FUNC_NAME(_VgrpF)
 
 #define IN_F_BLOCK(idx) ((idx) >= start_f_div_12 && (idx) < end_f_div_12)
 #ifndef SW_NOCACLU
-    for (n = 0; n < device_func_para.nbl->nci; n++)
+    for (n = 0; n < nbl.nci; n++)
     {
         int i, d, write_ci;
 #ifdef DEBUG_SDLB
         TLOG("kaCHI 4.1.\n");
-        TLOG("kaCHI nci =%d, n=%d\n", device_func_para.nbl->nci, n);
+        TLOG("kaCHI nci =%d, n=%d\n", nbl.nci, n);
         //wait_host(device_core_id);
 #endif
-        //nbln_o = device_func_para.nbl->ci[n];
+        //nbln_o = nbl.ci[n];
         //nbln = &nbln_o;
-        nbln = &device_func_para.nbl->ci[n];
-        //sync_get(nbln, device_func_para.nbl->ci+n, sizeof(nbnxn_ci_t));
+        nbln = &nbl.ci[n];
+        //sync_get(nbln, nbl.ci+n, sizeof(nbnxn_ci_t));
         DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
         TLOG("kaCHI 4.2.\n");
@@ -331,8 +354,9 @@ NBK_FUNC_NAME(_VgrpF)
         //TODO: ldm load: x, q， func_para_shiftvec
         Cxi_p = xi_C(ci);
         Cqi_p = qi_C(ci);
-        // type 上爆了。。。。
-        // Cti_p = ti_C(ci);
+
+        Cti_p = ti_C(ci);
+
         for (i = 0; i < UNROLLI; i++)
         {
             for (d = 0; d < DIM; d++)
@@ -347,13 +371,8 @@ NBK_FUNC_NAME(_VgrpF)
                 xi[i*XI_STRIDE+d] = Cxi_p[i*X_STRIDE+d] + func_para_shiftvec[ishf+d];
                 fi[i*FI_STRIDE+d] = 0;
             }
-#ifdef DEBUG_CACHE
-            if(q[ci*UNROLLI+i] != Cqi_p[i])
-            {
-                TLOG("KAAAA! Cache ERR: ci =%d\n", ci);
-            }
-#endif
-            // qi[i] = facel*q[ci*UNROLLI+i];
+
+            //qi[i] = facel*q[ci*UNROLLI+i];
             qi[i] = facel*Cqi_p[i];
         }
         DEVICE_CODE_FENCE();
@@ -383,13 +402,7 @@ NBK_FUNC_NAME(_VgrpF)
                 {
                     //TODO: REDUCE SUM
                     /* Coulomb self interaction */
-#ifdef DEBUG_CACHE
-                    if(q[ci*UNROLLI+i] != Cqi_p[i])
-                    {
-                        TLOG("KAAAA! Cache ERR: ci =%d\n", ci);
-                    }
-#endif
-                    // ldm_Vc   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+                    //ldm_Vc   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
                     ldm_Vc   -= qi[i]*Cqi_p[i]*Vc_sub_self;
                 }
             }
@@ -400,7 +413,7 @@ NBK_FUNC_NAME(_VgrpF)
         //wait_host(device_core_id);
 #endif
         cjind = cjind0;
-        while (cjind < cjind1 && device_func_para.nbl->cj[cjind].excl != 0xffff)
+        while (cjind < cjind1 && nbl.cj[cjind].excl != 0xffff)
         {
 #define CHECK_EXCLS
             if (half_LJ)
@@ -493,10 +506,9 @@ NBK_FUNC_NAME(_VgrpF)
     DEVICE_CODE_FENCE();
 #endif /* SW_NOCACLU */
     //memcpy(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
-    sync_put(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
-    //free(ldm_f);
+    async_put(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
     DEVICE_CODE_FENCE();
-    device_free(unaligned_ldm_f, (sz_f+DEVICE_SAFE_PAD)*sizeof(real));
+
 #ifdef CALC_SHIFTFORCES
     if (device_func_para.expand_fshift != NULL)
     {
@@ -508,11 +520,24 @@ NBK_FUNC_NAME(_VgrpF)
     device_func_para.expand_Vvdw[device_core_id] = ldm_Vvdw;
     device_func_para.expand_Vc  [device_core_id] = ldm_Vc;
 #endif
+
+#ifdef CALC_COUL_TAB
+#ifndef GMX_DOUBLE
+    device_free(unaligned_FDV0, (ic.tabq_size*4+DEVICE_SAFE_PAD)*sizeof(real));
+#else
+#endif // GMX_DOUBLE
+#endif // CALC_COUL_TAB
+
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 10.\n");
     //wait_host(device_core_id);
 #endif
     DEVICE_CODE_FENCE();
+#ifdef CALC_SHIFTFORCES
+    wait_all_async_put();
+#endif
+    //free(ldm_f);
+    device_free(unaligned_ldm_f, (sz_f+DEVICE_SAFE_PAD)*sizeof(real));
 #undef IN_F_BLOCK
 }
 
