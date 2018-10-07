@@ -61,7 +61,7 @@
         int type_i_off;
         int j;
 
-        ai = ci*UNROLLI + i;
+        //ai = ci*UNROLLI + i;
 
         //TODO: ldm load: type
         //type_i_off = type[ai]*ntype2;

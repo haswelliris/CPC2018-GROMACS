@@ -175,7 +175,7 @@ NBK_FUNC_NAME(_VgrpF)
 
 #ifndef GMX_DOUBLE
     //tab_coul_FDV0 = device_func_para.tabq_coul_FDV0;
-    void *unaligned_FDV0 = device_malloc((ic.tabq_size*4+DEVICE_SAFE_PAD)*sizeof(real));
+    void *unaligned_FDV0 = device_malloc(ic.tabq_size*4*sizeof(real)+DEVICE_SAFE_PAD);
     if(unaligned_FDV0 == NULL)
     {
         ALOG("Not enough MEM.\n");
@@ -195,7 +195,7 @@ NBK_FUNC_NAME(_VgrpF)
             TLOG("rcoulomb =%f, rcut2 =%f\n", ic.rcoulomb, rcut2);
 #endif
     ntype2              = nbat.ntype*2;
-    nbfp                = nbat.nbfp;
+    //nbfp                = nbat.nbfp;
     q                   = nbat.q;
     type                = nbat.type;
     facel               = ic.epsfac;
@@ -252,6 +252,15 @@ NBK_FUNC_NAME(_VgrpF)
     // ===== INIT CACHE =====
 
     DEVICE_CODE_FENCE();
+    void *unaligned_nbfp = device_malloc(nbat.ntype*nbat.ntype*2*sizeof(real)+DEVICE_SAFE_PAD);
+    if(unaligned_nbfp == NULL)
+    {
+        ALOG("Not enough MEM.\n");
+        return;
+    }
+    nbfp = (real*)device_align(unaligned_nbfp, 64, 0);
+    DEVICE_CODE_FENCE();
+    async_get(nbfp, nbat.nbfp, nbat.ntype*nbat.ntype*2*sizeof(real));
 #ifdef CALC_SHIFTFORCES
     real  ldm_fshift[SHIFTS*DIM];
 #endif
@@ -261,7 +270,7 @@ NBK_FUNC_NAME(_VgrpF)
 
     //ldm_f = (real*)malloc(sz_f*sizeof(real));
     /* FIXED: SEEMS NOT ENOUGH MEMORY */
-    void *unaligned_ldm_f = device_malloc((sz_f+DEVICE_SAFE_PAD)*sizeof(real));
+    void *unaligned_ldm_f = device_malloc(sz_f*sizeof(real)+DEVICE_SAFE_PAD);
     if(unaligned_ldm_f == NULL)
     {
         ALOG("Not enough MEM.\n");
@@ -518,11 +527,11 @@ NBK_FUNC_NAME(_VgrpF)
 
 #ifdef CALC_COUL_TAB
 #ifndef GMX_DOUBLE
-    device_free(unaligned_FDV0, (ic.tabq_size*4+DEVICE_SAFE_PAD)*sizeof(real));
+    device_free(unaligned_FDV0, ic.tabq_size*4*sizeof(real)+DEVICE_SAFE_PAD);
 #else
 #endif // GMX_DOUBLE
 #endif // CALC_COUL_TAB
-
+    device_free(unaligned_nbfp, nbat.ntype*nbat.ntype*2*sizeof(real)+DEVICE_SAFE_PAD);
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 10.\n");
     //wait_host(device_core_id);
@@ -532,7 +541,7 @@ NBK_FUNC_NAME(_VgrpF)
     wait_all_async_put();
 #endif
     //free(ldm_f);
-    device_free(unaligned_ldm_f, (sz_f+DEVICE_SAFE_PAD)*sizeof(real));
+    device_free(unaligned_ldm_f, sz_f*sizeof(real)+DEVICE_SAFE_PAD);
 #undef IN_F_BLOCK
 }
 

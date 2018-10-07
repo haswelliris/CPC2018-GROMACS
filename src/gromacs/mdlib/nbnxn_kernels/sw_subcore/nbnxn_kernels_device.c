@@ -282,32 +282,29 @@ static inline _cj_cache_t *cj_C(int idx)
 
 }
 
-#define NF_GP   (2)
-#ifndef GMX_DOUBLE
-#define NF_SZ   (256) //(128*2)
-#define NF_MSK  (127)
-#define NF_LOG2 (7)
-#else
-#define NF_C_SZ (128) //(64*2)
-#define NF_MSK  (63)
-#define NF_LOG2 (6)
-#endif
 
 // ===== CACHE =====
 // -----  nbfp -----
+// but i wont use it
+// #define NF_SZ   (936)//(39*2*12)
+// #define NF_C_SZ (128) //(64*2)
+// #define NF_MSK  (63)
+// #define NF_LOG2 (6)
+// typedef struct {
+//     real C[NF_SZ];
+//     int hd;
+// } _nf_cache_t;
 
-typedef struct {
-    real C[NF_SZ];
-    int hd;
-} _nf_cache_t;
+// __thread_local _nf_cache_t Cnf; // 3744*[1~2] Byte
+// __thread_local int         Snf;
+// static inline real *nf_C(int idx)
+// {
 
-__thread_local _nf_cache_t Cnf; // 1024 B
-__thread_local int         Snf;
-static inline real *nf_C(int idx)
-{
+// }
 
-}
-
+// ===== CACHE =====
+// -----  fdv0 -----
+// but i wont use it
 /*//
 #ifndef GMX_DOUBLE
 #define FD_GP   (4) // FDV0
@@ -350,7 +347,7 @@ static inline void clear_C()
    Cci.hd = -1;
    Ccj.hd = -1;
 
-   Cnf.hd = -1;
+   //Cnf.hd = -1;
 }
 
 typedef void (*p_nbk_func_noener)();
