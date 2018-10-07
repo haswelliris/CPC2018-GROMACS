@@ -527,11 +527,11 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
 #ifdef HAHAHAHAHAHAHAHA
         if(coult == 1)
         {
-            usleep(120000);
+            usleep(40000);
         }
         else
         {
-            usleep(800000);
+            usleep(400000);
         }
 #endif
         if (!(force_flags & GMX_FORCE_ENERGY))
