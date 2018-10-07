@@ -36,7 +36,7 @@
 #define UNROLLI    NBNXN_CPU_CLUSTER_I_SIZE
 #define UNROLLJ    NBNXN_CPU_CLUSTER_I_SIZE
 
-/* We could use device_func_para.nbat->xstride and device_func_para.nbat->fstride, but macros might be faster */
+/* We could use nbat.xstride and nbat.fstride, but macros might be faster */
 #define X_STRIDE   3
 #define F_STRIDE   3
 /* Local i-atom buffer strides */
@@ -150,18 +150,27 @@ NBK_FUNC_NAME(_VgrpF)
     //wait_host(device_core_id);
 #endif
 
+    nbnxn_pairlist_t     nbl;
+    nbnxn_atomdata_t     nbat;
+    interaction_const_t  ic;
+    async_get(&nbl, device_func_para.nbl, sizeof(nbnxn_pairlist_t));
+    async_get(&nbat, device_func_para.nbat, sizeof(nbnxn_atomdata_t));
+    async_get(&ic, device_func_para.ic, sizeof(interaction_const_t));
+    wait_all_async_get();
+
     // =========== INIT DATA =============
+    real cpot = ic.repulsion_shift.cpot;
 #ifdef CALC_COUL_RF
-    k_rf2 = 2*device_func_para.ic->k_rf;
+    k_rf2 = 2*ic.k_rf;
 #ifdef CALC_ENERGIES
-    k_rf = device_func_para.ic->k_rf;
-    c_rf = device_func_para.ic->c_rf;
+    k_rf = ic.k_rf;
+    c_rf = ic.c_rf;
 #endif
 #endif
 #ifdef CALC_COUL_TAB
-    tabscale = device_func_para.ic->tabq_scale;
+    tabscale = ic.tabq_scale;
 #ifdef CALC_ENERGIES
-    halfsp = 0.5/device_func_para.ic->tabq_scale;
+    halfsp = 0.5/ic.tabq_scale;
 #endif
 
 #ifndef GMX_DOUBLE
@@ -173,19 +182,19 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
 
 
-    rcut2               = device_func_para.ic->rcoulomb*device_func_para.ic->rcoulomb;
+    rcut2               = ic.rcoulomb*ic.rcoulomb;
 #ifdef DEBUG_FPEX
-            TLOG("rcoulomb =%f, rcut2 =%f\n", device_func_para.ic->rcoulomb, rcut2);
+            TLOG("rcoulomb =%f, rcut2 =%f\n", ic.rcoulomb, rcut2);
 #endif
-    ntype2              = device_func_para.nbat->ntype*2;
-    nbfp                = device_func_para.nbat->nbfp;
-    q                   = device_func_para.nbat->q;
-    type                = device_func_para.nbat->type;
-    facel               = device_func_para.ic->epsfac;
+    ntype2              = nbat.ntype*2;
+    nbfp                = nbat.nbfp;
+    q                   = nbat.q;
+    type                = nbat.type;
+    facel               = ic.epsfac;
     //func_para_shiftvec            = device_func_para.shift_vec[0];
-    x                   = device_func_para.nbat->x;
+    x                   = nbat.x;
 
-    l_cj = device_func_para.nbl->cj;
+    l_cj = nbl.cj;
     // =========== INIT DATA =============
     DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
@@ -193,8 +202,8 @@ NBK_FUNC_NAME(_VgrpF)
     //wait_host(device_core_id);
 #endif
 
-    int natoms = device_func_para.nbat->natoms;
-    int fstride = device_func_para.nbat->fstride;
+    int natoms = nbat.natoms;
+    int fstride = nbat.fstride;
     int sizeof_f = natoms*fstride;
     int sizeof_f_div_12 = sizeof_f/12;
     int sizeof_fshift = SHIFTS*DIM; // 135 * sizeof(float)
@@ -278,18 +287,18 @@ NBK_FUNC_NAME(_VgrpF)
 
 #define IN_F_BLOCK(idx) ((idx) >= start_f_div_12 && (idx) < end_f_div_12)
 #ifndef SW_NOCACLU
-    for (n = 0; n < device_func_para.nbl->nci; n++)
+    for (n = 0; n < nbl.nci; n++)
     {
         int i, d, write_ci;
 #ifdef DEBUG_SDLB
         TLOG("kaCHI 4.1.\n");
-        TLOG("kaCHI nci =%d, n=%d\n", device_func_para.nbl->nci, n);
+        TLOG("kaCHI nci =%d, n=%d\n", nbl.nci, n);
         //wait_host(device_core_id);
 #endif
-        //nbln_o = device_func_para.nbl->ci[n];
+        //nbln_o = nbl.ci[n];
         //nbln = &nbln_o;
-        nbln = &device_func_para.nbl->ci[n];
-        //sync_get(nbln, device_func_para.nbl->ci+n, sizeof(nbnxn_ci_t));
+        nbln = &nbl.ci[n];
+        //sync_get(nbln, nbl.ci+n, sizeof(nbnxn_ci_t));
         DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
         TLOG("kaCHI 4.2.\n");
@@ -389,7 +398,7 @@ NBK_FUNC_NAME(_VgrpF)
         //wait_host(device_core_id);
 #endif
         cjind = cjind0;
-        while (cjind < cjind1 && device_func_para.nbl->cj[cjind].excl != 0xffff)
+        while (cjind < cjind1 && nbl.cj[cjind].excl != 0xffff)
         {
 #define CHECK_EXCLS
             if (half_LJ)

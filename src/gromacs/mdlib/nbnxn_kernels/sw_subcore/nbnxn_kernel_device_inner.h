@@ -193,8 +193,8 @@
                 frLJ    = FrLJ12 - FrLJ6;
                 /* 7 flops for r^-2 + LJ force */
 #if defined CALC_ENERGIES
-                VLJ     = (FrLJ12 + c12*device_func_para.ic->repulsion_shift.cpot)/12 -
-                    (FrLJ6 + c6*device_func_para.ic->dispersion_shift.cpot)/6;
+                VLJ     = (FrLJ12 + c12*cpot)/12 -
+                    (FrLJ6 + c6*cpot)/6;
                 /* 7 flops for LJ energy */
 #endif
 #endif
@@ -250,9 +250,9 @@
 #ifdef CALC_COUL_TAB
             DEVICE_CODE_FENCE();
 #ifdef DEBUG_FPEX
-            TLOG("rsq =%f, tabq_scale =%f\n", rsq, device_func_para.ic->tabq_scale);
+            TLOG("rsq =%f, tabq_scale =%f\n", rsq, ic.tabq_scale);
 #endif
-            rs     = rsq*rinv*device_func_para.ic->tabq_scale;
+            rs     = rsq*rinv*ic.tabq_scale;
             ri     = (int)rs;
             frac   = rs - ri;
 #ifndef GMX_DOUBLE
@@ -269,14 +269,14 @@
 #ifndef GMX_DOUBLE
             //TODO: ldm load: tab_coul_FDV0, tab_coul_V, tab_coul_F
 #ifdef DEBUG_FPEX
-            TLOG("qq =%f, rinv =%f, interact =%f, sh_ewald =%f, halfsp =%f, frac =%f, fexcl =%f\n", qq, Vc_ci, interact, device_func_para.ic->sh_ewald, halfsp, frac, fexcl);
+            TLOG("qq =%f, rinv =%f, interact =%f, sh_ewald =%f, halfsp =%f, frac =%f, fexcl =%f\n", qq, Vc_ci, interact, ic.sh_ewald, halfsp, frac, fexcl);
 #endif
-            vcoul  = qq*(interact*(rinv - device_func_para.ic->sh_ewald)
+            vcoul  = qq*(interact*(rinv - ic.sh_ewald)
                          -(tab_coul_FDV0[ri*4+2]
                            -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
             /* 7 flops for float 1/r-table energy (8 with excls) */
 #else
-            vcoul  = qq*(interact*(rinv - device_func_para.ic->sh_ewald)
+            vcoul  = qq*(interact*(rinv - ic.sh_ewald)
                          -(tab_coul_V[ri]
                            -halfsp*frac*(tab_coul_F[ri] + fexcl)));
 #endif
