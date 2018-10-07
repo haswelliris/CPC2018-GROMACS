@@ -73,7 +73,7 @@ void wait_host(int device_core_id)
                 sizeof(long) * PARAM_SIZE, (void*)(&sync_get_reply), 0, 0, 0
             );
             while(sync_get_reply != 1);
-            asm volatile ("#nop":::"memory");
+            asm volatile ("nop":::"memory");
             if(device_in_param[PARAM_NOTICE] >= device_notice_counter)
                 break;
         }

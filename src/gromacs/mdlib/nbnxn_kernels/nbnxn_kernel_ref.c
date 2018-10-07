@@ -54,6 +54,7 @@
 #include "gromacs/mdlib/nbnxn_kernels/sw_subcore/SwHost.h"
 // extern void subcore_fun( struct WorkLoadPara *, int);
 struct WorkLoadPara workLoadPara_host;
+int step_count=0;
 
 nbnxn_pairlist_t* deep_copy_nbl(nbnxn_pairlist_t *src, int new_or_delete)
 {

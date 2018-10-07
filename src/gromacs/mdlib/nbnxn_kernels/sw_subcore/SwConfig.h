@@ -52,6 +52,8 @@ struct WorkLoadPara {
     real                        *tabq_coul_FDV0;
     real                        *tabq_coul_F;
     real                        *tabq_coul_V;
+    int                         *f_start;
+    int                         *f_end;
 };
 
 // ---- CUSTOM CONFIG

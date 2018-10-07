@@ -137,8 +137,10 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 		wait_all_async_get();
 	#endif
 
-	int f_start = BLOCK_HEAD(device_core_id, 64, nbat.natoms/4)*12;
-    int f_end = f_start + BLOCK_SIZE(device_core_id, 64, nbat.natoms/4)*12;
+	// int f_start = BLOCK_HEAD(device_core_id, 64, nbat.natoms/4)*12;
+    // int f_end = f_start + BLOCK_SIZE(device_core_id, 64, nbat.natoms/4)*12;
+	int f_start = workLoadPara.f_start[device_core_id]*12;
+	int f_end = workLoadPara.f_end[device_core_id]*12;
     if (f_end - f_start > F_LOCAL_SIZE)
     	printf("F_LOCAL_SIZE is not big enough!\n");
 	aget_mem(f_local, f+f_start, (f_end-f_start)*sizeof(real));
@@ -414,4 +416,3 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 	put_mem(workLoadPara.Vc_host+device_core_id, &Vc_local, sizeof(real));
 	// #endif
 }
-

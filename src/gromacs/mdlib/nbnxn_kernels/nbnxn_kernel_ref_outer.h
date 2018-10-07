@@ -145,9 +145,9 @@ NBK_FUNC_NAME(_VgrpF)
 
     #define macro_has(para_name) ((macro_para >> para_name) & 1)
 
-    real fshift_host[64*SHIFTS*DIM];
-    real Vvdw_host[64];
-    real Vc_host[64];
+    real *fshift_host = (real*)malloc(64*SHIFTS*DIM*sizeof(real));
+    real *Vvdw_host = (real*)malloc(64*sizeof(real));
+    real *Vc_host = (real*)malloc(64*sizeof(real));
 
     nbnxn_pairlist_t *nbl_host = deep_copy_nbl(nbl, 1);
     nbnxn_atomdata_t *nbat_host = deep_copy_nbat(nbat, 1);
@@ -187,16 +187,68 @@ NBK_FUNC_NAME(_VgrpF)
 
     int device_core_id;
 
-    // fake subcore
-    // for (device_core_id = 0; device_core_id < 64; device_core_id++)
-    //     subcore_func(&workLoadPara_host, device_core_id);
+    int rank, n, i;
+    // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    // if (rank == 0) {
+	    int f_count_len = nbat->natoms/4;
+	    int *f_count = (int*)malloc(f_count_len*sizeof(int));
+	    memset(f_count, 0, f_count_len*sizeof(int));
+	    int tot_work_count = 0, avg_work_load = 0;;
 
+	    #define MAX_F_LDM_SIZE 420
+	    int *workload = (int*)malloc(64*sizeof(int));;
+	    memset(workload, 0, 64*sizeof(int));
+	    int *f_start = (int*)malloc(64*sizeof(int));;
+	    memset(f_start, 0, 64*sizeof(int));
+	    int *f_end = (int*)malloc(64*sizeof(int));;
+	    memset(f_end, 0, 64*sizeof(int));
+
+	    for (n = 0; n < nbl->nci; n++) {
+	    	f_count[nbl->ci[n].ci] += nbl->ci[n].cj_ind_end - nbl->ci[n].cj_ind_start;
+	    	tot_work_count += nbl->ci[n].cj_ind_end - nbl->ci[n].cj_ind_start;
+	    	for (i = nbl->ci[n].cj_ind_start; i < nbl->ci[n].cj_ind_end; i++) {
+	    		f_count[nbl->cj[i].cj]++;
+	    		tot_work_count++;
+	    	}
+	    }
+	    avg_work_load = tot_work_count/64+1;
+	    // printf("f_count_len = %d\n", f_count_len);
+	    // printf("tot_work_count = %d\n", tot_work_count);
+	    // printf("avg_work_load = %d\n", avg_work_load);
+	    int p = 0;
+	    while (f_count[f_count_len-1] == 0)
+	    	f_count_len--;
+    	for (device_core_id = 0; device_core_id < 64; device_core_id++) {
+	    	while (f_count[p] == 0) p++;
+    		f_start[device_core_id] = p;
+    		while (p < f_count_len && 
+    			workload[device_core_id] < avg_work_load && 
+    			(p - f_start[device_core_id]) <= MAX_F_LDM_SIZE &&
+    			(f_count_len - p) < (63 - device_core_id)*MAX_F_LDM_SIZE ) 
+    		{
+    			workload[device_core_id]+=f_count[p];
+    			p++;
+    		}
+    		f_end[device_core_id] = p;
+		}
+		// for (device_core_id = 0; device_core_id < 64; device_core_id++) {
+		// 	printf("%d [%d - %d] = %d\n", device_core_id,f_start[device_core_id], f_end[device_core_id], workload[device_core_id]);
+		// }
+    // }
+    step_count++;
+
+    workLoadPara_host.f_start        	= f_start;
+    workLoadPara_host.f_end				= f_end;
+
+    // fake subcore
+    for (device_core_id = 0; device_core_id < 64; device_core_id++)
+        subcore_func(&workLoadPara_host, device_core_id);
+    
     // real subcore
-    host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara_host;
-    host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
-    notice_device();
-    wait_device();
-    // printf("done!\n");
+    // host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara_host;
+    // host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+    // notice_device();
+    // wait_device();
     // exit(0);
 
     memcpy(f, f_host, nbat->natoms*F_STRIDE*sizeof(real));
@@ -207,7 +259,6 @@ NBK_FUNC_NAME(_VgrpF)
             fshift_host[(device_core_id+1)*SHIFTS*DIM+my_i] += fshift_host[device_core_id*SHIFTS*DIM+my_i];
     for (my_i = 0; my_i < SHIFTS*DIM; my_i++)
         fshift[my_i] = fshift_host[63*SHIFTS*DIM+my_i];
-
     if (macro_has(para_CALC_ENERGIES)) {
         for (device_core_id = 0; device_core_id < 64; device_core_id++) {
             *Vvdw += Vvdw_host[device_core_id];
@@ -215,10 +266,21 @@ NBK_FUNC_NAME(_VgrpF)
         }
     }
 
+    free(fshift_host);
+    free(Vvdw_host);
+    free(Vc_host);
     free(f_host);
     free(shift_vec_host);
     deep_copy_nbl(nbl_host, 0);
     deep_copy_nbat(nbat_host, 0);
+
+    free(f_count);
+    free(workload);
+    free(f_start);
+    free(f_end);
+
+
+    // printf("%d\n", step_count++);
 
 #ifdef COUNT_PAIRS
     printf("atom pairs %d\n", npair);
