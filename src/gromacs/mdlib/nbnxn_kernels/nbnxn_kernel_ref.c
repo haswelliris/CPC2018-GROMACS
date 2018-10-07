@@ -465,9 +465,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
     	memset(f_start, 0, 64*sizeof(int));
 	    int *f_end = (int*)malloc(64*sizeof(int));
 	    memset(f_end, 0, 64*sizeof(int));
-
+        //wallcycle_sub_start(wcycle, ewcsMEMCPY);
         subcore_loadbalance(nbat, nbl[nb], f_start, f_end);
-
+        //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
         nbnxn_atomdata_output_t *out;
         real                    *fshift_p;
 
@@ -491,7 +491,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                 clear_fshift(fshift_p);
             }
         }
-        wallcycle_sub_start(wcycle, ewcsMEMCPY);
+        //wallcycle_sub_start(wcycle, ewcsMEMCPY);
         real *expand_fshift = (real*)malloc(SHIFTS*DIM*64*sizeof(real));
 
         real *other_f       = (real*)malloc(nbat->natoms*nbat->fstride*sizeof(real));
@@ -519,7 +519,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         memcpy(other_tabq_coul_F, ic->tabq_coul_F, ic->tabq_size*sizeof(real));
         memcpy(other_tabq_coul_V, ic->tabq_coul_V, ic->tabq_size*sizeof(real));
 #endif
-        wallcycle_sub_stop(wcycle, ewcsMEMCPY);
+        //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
         // if the tabq_coul_FDV0 can load to LDM?
         // TLOG("tabq_coul_FDV0_SZ =%d Byte\n", ic->tabq_size*4*sizeof(real));
         // TLOG("tabq_size =%d, ntype =%d, natoms =%d\n", ic->tabq_size, nbat->ntype, nbat->natoms);
@@ -753,7 +753,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         TLOG("MOee 4.\n");
         wait_device();
 #endif
-        wallcycle_sub_start(wcycle, ewcsMEMCPY);
+        //wallcycle_sub_start(wcycle, ewcsMEMCPY);
         memcpy(out->f, other_f, nbat->natoms*nbat->fstride*sizeof(real));
         free(other_f);
 
@@ -772,7 +772,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         free(other_tabq_coul_F);
         free(other_tabq_coul_V);
 #endif
-        wallcycle_sub_stop(wcycle, ewcsMEMCPY);
+        //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
         free(f_start);
         free(f_end);
 #ifdef DEBUG_FPEX

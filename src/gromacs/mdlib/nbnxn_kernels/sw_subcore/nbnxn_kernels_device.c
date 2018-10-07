@@ -39,7 +39,7 @@ static inline real *xi_C(unsigned int gp_i)
     {
         return &Cxi.C[Coffset*XC_GP];
     }
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     Cxi.hd = Chead;
 #ifndef DEEP_DARK_FANTASY
     if((gp_i+XC_MSK+1) <= Sxi)
@@ -54,7 +54,7 @@ static inline real *xi_C(unsigned int gp_i)
 #else
     sync_get(&Cxi.C[0], Hxi+XC_SZ*Chead, XC_SZ*sizeof(real));
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     return &Cxi.C[Coffset*XC_GP];
 }
 
@@ -67,7 +67,7 @@ static inline real *xj_C(unsigned int gp_i)
     {
         return &Cxj.C[Coffset*XC_GP];
     }
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     Cxj.hd = Chead;
 #ifndef DEEP_DARK_FANTASY
     else if((gp_i+XC_MSK+1) <= Sxj)
@@ -82,7 +82,7 @@ static inline real *xj_C(unsigned int gp_i)
 #else
     sync_get(&Cxj.C[0], Hxj+XC_SZ*Chead, XC_SZ*sizeof(real));
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     return &Cxj.C[Coffset*XC_GP];
 }
 
@@ -121,7 +121,7 @@ static inline real *qi_C(unsigned int gp_i)
     {
         return &Cqi.C[Coffset*QC_GP];
     }
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     Cqi.hd = Chead;
 #ifndef DEEP_DARK_FANTASY
     if((gp_i+QC_MSK+1) <= Sqi)
@@ -136,7 +136,7 @@ static inline real *qi_C(unsigned int gp_i)
 #else
     sync_get(&Cqi.C[0], Hqi+QC_SZ*Chead, QC_SZ*sizeof(real));
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     return &Cqi.C[Coffset*QC_GP];
 }
 
@@ -149,7 +149,7 @@ static inline real *qj_C(unsigned int gp_i)
     {
         return &Cqj.C[Coffset*QC_GP];
     }
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     Cqj.hd = Chead;
 #ifndef DEEP_DARK_FANTASY
     if((gp_i+QC_MSK+1) <= Sqj)
@@ -164,7 +164,7 @@ static inline real *qj_C(unsigned int gp_i)
 #else
     sync_get(&Cqj.C[0], Hqj+QC_SZ*Chead, QC_SZ*sizeof(real));
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     return &Cqj.C[Coffset*QC_GP];
 }
 
@@ -197,7 +197,7 @@ static inline int *ti_C(unsigned int gp_i)
     {
         return &Cti.C[Coffset*TC_GP];
     }
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     Cti.hd = Chead;
 #ifndef DEEP_DARK_FANTASY
     if((gp_i+TC_MSK+1) <= Sti)
@@ -212,7 +212,7 @@ static inline int *ti_C(unsigned int gp_i)
 #else
     sync_get(&Cti.C[0], Hti+TC_SZ*Chead, TC_SZ*sizeof(real));
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     return &Cti.C[Coffset*TC_GP];
 }
 
@@ -225,7 +225,7 @@ static inline int *tj_C(unsigned int gp_i)
     {
         return &Ctj.C[Coffset*TC_GP];
     }
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     Ctj.hd = Chead;
 #ifndef DEEP_DARK_FANTASY
     if((gp_i+TC_MSK+1) <= Stj)
@@ -240,7 +240,7 @@ static inline int *tj_C(unsigned int gp_i)
 #else
     sync_get(&Ctj.C[0], Htj+TC_SZ*Chead, TC_SZ*sizeof(real));
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     return &Ctj.C[Coffset*TC_GP];
 }
 
@@ -267,7 +267,7 @@ static inline nbnxn_ci_t *ci_C(unsigned int gp_i)
     {
         return &Cci.C[Coffset];
     }
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     Cci.hd = Chead;
 #ifndef DEEP_DARK_FANTASY
     if((gp_i+CI_MSK+1) <= Sci)
@@ -282,7 +282,7 @@ static inline nbnxn_ci_t *ci_C(unsigned int gp_i)
 #else
     sync_get(&Cci.C[0], Hci+CI_SZ*Chead, CI_SZ*sizeof(nbnxn_ci_t));
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     return &Cci.C[Coffset];
 }
 
@@ -308,7 +308,7 @@ static inline nbnxn_cj_t *cj_C(unsigned int gp_i)
     {
         return &Ccj.C[Coffset];
     }
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     Ccj.hd = Chead;
 #ifndef DEEP_DARK_FANTASY
     if((gp_i+CJ_MSK+1) <= Scj)
@@ -323,7 +323,7 @@ static inline nbnxn_cj_t *cj_C(unsigned int gp_i)
 #else
     sync_get(&Ccj.C[0], Hcj+CJ_SZ*Chead, CJ_SZ*sizeof(nbnxn_cj_t));
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     return &Ccj.C[Coffset];
 }
 

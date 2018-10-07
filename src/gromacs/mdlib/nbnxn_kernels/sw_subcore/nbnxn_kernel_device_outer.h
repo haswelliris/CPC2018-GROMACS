@@ -249,7 +249,7 @@ NBK_FUNC_NAME(_VgrpF)
     x                   = nbat.x;
 
     // =========== INIT DATA =============
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 2.\n");
     //wait_host(device_core_id);
@@ -291,7 +291,7 @@ NBK_FUNC_NAME(_VgrpF)
     }
     // ===== INIT CACHE =====
 
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     void *unaligned_nbfp = device_malloc(nbat.ntype*nbat.ntype*2*sizeof(real)+DEVICE_SAFE_PAD);
     if(unaligned_nbfp == NULL)
     {
@@ -299,11 +299,11 @@ NBK_FUNC_NAME(_VgrpF)
         return;
     }
     nbfp = (real*)device_align(unaligned_nbfp, 64, 0);
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
     async_get(nbfp, nbat.nbfp, nbat.ntype*nbat.ntype*2*sizeof(real));
 
     // ================ malloc ldm_f ===================
-    //ldm_f = (real*)malloc(sz_f*sizeof(real));
+    // ldm_f = (real*)malloc(sz_f*sizeof(real));
     /* FIXED: SEEMS NOT ENOUGH MEMORY */
     // void *unaligned_ldm_f = device_malloc(sz_f*sizeof(real)+DEVICE_SAFE_PAD);
     // if(unaligned_ldm_f == NULL)
@@ -315,7 +315,7 @@ NBK_FUNC_NAME(_VgrpF)
 #ifdef DEBUG_LB
     //wait_host(device_core_id);
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 3.\n");
     int ii;
@@ -342,7 +342,7 @@ NBK_FUNC_NAME(_VgrpF)
     memset(ldm_fshift, 0, SHIFTS*DIM*sizeof(real));
 #endif
     wait_all_async_get();
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 4.\n");
     //wait_host(device_core_id);
@@ -363,7 +363,7 @@ NBK_FUNC_NAME(_VgrpF)
         //nbln = &nbl.ci[n];
         //sync_get(nbln, nbl.ci+n, sizeof(nbnxn_ci_t));
         nbln = ci_C(n);
-        DEVICE_CODE_FENCE();
+        //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
         TLOG("kaCHI 4.2.\n");
         //wait_host(device_core_id);
@@ -399,7 +399,7 @@ NBK_FUNC_NAME(_VgrpF)
         Vvdw_ci = 0;
         Vc_ci   = 0;
 #endif
-        DEVICE_CODE_FENCE();
+        //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
         TLOG("kaCHI 5.\n");
         //wait_host(device_core_id);
@@ -426,7 +426,7 @@ NBK_FUNC_NAME(_VgrpF)
             //qi[i] = facel*q[ci*UNROLLI+i];
             qi[i] = facel*Cqi_p[i];
         }
-        DEVICE_CODE_FENCE();
+        //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
         TLOG("kaCHI 6.\n");
         //wait_host(device_core_id);
@@ -554,18 +554,18 @@ NBK_FUNC_NAME(_VgrpF)
             ldm_Vc   += Vc_ci;
 #endif
         }
-        DEVICE_CODE_FENCE();
+        //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
         TLOG("kaCHI 9.\n");
         //wait_host(device_core_id);
 #endif
     }
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
 #endif /* SW_NOCACLU */
     //memcpy(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
     //if(sz_f != 0)
     async_put(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
 
 #ifdef CALC_SHIFTFORCES
     if (device_func_para.expand_fshift != NULL)
@@ -590,7 +590,7 @@ NBK_FUNC_NAME(_VgrpF)
     TLOG("kaCHI 10.\n");
     //wait_host(device_core_id);
 #endif
-    DEVICE_CODE_FENCE();
+    //DEVICE_CODE_FENCE();
 #ifdef CALC_SHIFTFORCES
     wait_all_async_put();
 #endif

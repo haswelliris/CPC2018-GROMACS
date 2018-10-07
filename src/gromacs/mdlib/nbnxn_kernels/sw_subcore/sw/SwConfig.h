@@ -77,6 +77,7 @@ struct InitParam
 #undef HAHAHAHAHAHAHAHA
 
 #define DEBUG_LB
+#undef DEBUG_LB
 
 #define MAX_F_LDM_SIZE 360 // div 12
 // ----

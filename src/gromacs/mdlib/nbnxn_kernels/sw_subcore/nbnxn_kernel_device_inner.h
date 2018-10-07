@@ -115,7 +115,7 @@
 #define interact 1.0
             skipmask = 1.0;
 #endif
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.1.\n");
 #endif
@@ -154,7 +154,7 @@
             /* Prepare to enforce the cut-off. */
             skipmask = (rsq >= rcut2) ? 0 : skipmask;
             /* 9 flops for r^2 + cut-off check */
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.2.\n");
             //wait_host(device_core_id);
@@ -203,7 +203,7 @@
                 /* 7 flops for LJ energy */
 #endif
 #endif
-                DEVICE_CODE_FENCE();
+                //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
                 TLOG("kaCHI 7.2.1.\n");
                 //wait_host(device_core_id);
@@ -223,7 +223,7 @@
                 /* 1 more flop for LJ energy */
 #endif
 
-                DEVICE_CODE_FENCE();
+                //DEVICE_CODE_FENCE();
 #ifdef CALC_ENERGIES
                 Vvdw_ci += VLJ;
                 /* 1 flop for LJ energy addition */
@@ -253,7 +253,7 @@
 #endif
 
 #ifdef CALC_COUL_TAB
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
 #ifdef DEBUG_FPEX
             TLOG("rsq =%f, tabq_scale =%f\n", rsq, ic.tabq_scale);
 #endif //DEBUG_FPEX
@@ -283,7 +283,7 @@
             fcoul  = interact*rinvsq - fexcl;
             /* 7 flops for float 1/r-table force */
 #ifdef CALC_ENERGIES
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
 #ifndef GMX_DOUBLE
             //TODO: ldm load: tab_coul_FDV0, tab_coul_V, tab_coul_F
 #ifdef DEBUG_FPEX
@@ -304,7 +304,7 @@
 #endif // CALC_ENERGIES
             fcoul *= qq*rinv;
 #endif // CALC_ENERGIES
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
 #ifdef CALC_ENERGIES
 #ifdef DEBUG_FPEX
             TLOG("Vc_ci =%f, vcoul =%f\n", Vc_ci, vcoul);
@@ -341,7 +341,7 @@
             fz = fscal*dz;
 
             /* Increment i-atom force */
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
 #ifdef SW_NEW_ALG
             // if(write_ci) {
 #endif
@@ -352,7 +352,7 @@
             // }
 #endif
             /* Decrement j-atom force */
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.3.\n");
             //wait_host(device_core_id);
