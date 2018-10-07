@@ -202,7 +202,6 @@ NBK_FUNC_NAME(_VgrpF)
     //func_para_shiftvec            = device_func_para.shift_vec[0];
     x                   = nbat.x;
 
-    l_cj = nbl.cj;
     // =========== INIT DATA =============
     DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
@@ -232,6 +231,9 @@ NBK_FUNC_NAME(_VgrpF)
 
     int  *Cti_p;
     int  *Ctj_p;
+
+    nbnxn_ci_t *Cci_p;
+    nbnxn_cj_t *Ccj_p;
     {
         clear_C();
         Hxi = x;
@@ -248,6 +250,11 @@ NBK_FUNC_NAME(_VgrpF)
         Sti = natoms >> 2;
         Htj = type;
         Stj = natoms >> 2;
+
+        Hci = nbl.ci;
+        Sci = nbl.nci;
+        Hcj = nbl.cj;
+        Scj = nbl.ncj;
     }
     // ===== INIT CACHE =====
 
@@ -316,20 +323,23 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
         //nbln_o = nbl.ci[n];
         //nbln = &nbln_o;
-        nbln = &nbl.ci[n];
+        //nbln = &nbl.ci[n];
         //sync_get(nbln, nbl.ci+n, sizeof(nbnxn_ci_t));
+        nbln = ci_C(n);
         DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
         TLOG("kaCHI 4.2.\n");
         //wait_host(device_core_id);
 #endif
+        ci               = nbln->ci;
         ish              = (nbln->shift & NBNXN_CI_SHIFT);
         /* x, device_func_para.f and device_func_para.fshift are assumed to be stored with stride 3 */
         ishf             = ish*DIM;
         cjind0           = nbln->cj_ind_start;
         cjind1           = nbln->cj_ind_end;
+        //l_cj             = nbl.cj;
+        //l_cj             = cj_C(nbln->cj_ind_start);
         /* Currently only works super-cells equal to sub-cells */
-        ci               = nbln->ci;
         ci_sh            = (ish == CENTRAL ? ci : -1);
         write_ci         = IN_F_BLOCK(ci);
 #ifdef DEBUG_SDLB
@@ -400,7 +410,8 @@ NBK_FUNC_NAME(_VgrpF)
 #endif
 #endif
 
-            if (l_cj[nbln->cj_ind_start].cj == ci_sh)
+            //if (l_cj[nbln->cj_ind_start].cj == ci_sh)
+            if(cj_C(nbln->cj_ind_start)->cj == ci_sh)
             {
                 for (i = 0; i < UNROLLI; i++)
                 {
@@ -417,8 +428,12 @@ NBK_FUNC_NAME(_VgrpF)
         //wait_host(device_core_id);
 #endif
         cjind = cjind0;
-        while (cjind < cjind1 && nbl.cj[cjind].excl != 0xffff)
+        //while (cjind < cjind1 && nbl.cj[cjind].excl != 0xffff)
+        while (cjind < cjind1)
         {
+            Ccj_p = cj_C(cjind);
+            if(Ccj_p->excl == 0xffff)
+                break;
 #define CHECK_EXCLS
             if (half_LJ)
             {
@@ -444,6 +459,7 @@ NBK_FUNC_NAME(_VgrpF)
 
         for (; (cjind < cjind1); cjind++)
         {
+            Ccj_p = cj_C(cjind);
             if (half_LJ)
             {
 #define CALC_COULOMB

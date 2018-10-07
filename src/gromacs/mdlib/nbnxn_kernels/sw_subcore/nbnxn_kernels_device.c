@@ -244,7 +244,6 @@ static inline int *tj_C(unsigned int gp_i)
     return &Ctj.C[Coffset*TC_GP];
 }
 
-#define CI_GP   (1)
 #define CI_SZ   (64)
 #define CI_MSK  (63)
 #define CI_LOG2 (6)
@@ -256,14 +255,37 @@ typedef struct {
 // ===== CACHE =====
 // -----   ci  -----
 
+__thread_local nbnxn_ci_t *Hci;
 __thread_local _ci_cache_t Cci; // 1024 B
 __thread_local int         Sci;
-static inline _ci_cache_t *ci_C(int idx)
+static inline nbnxn_ci_t *ci_C(unsigned int gp_i)
 {
-
+    int Coffset = M2_MOD(gp_i,CI_MSK);
+    int Chead   = M2_DIV(gp_i,CI_LOG2);
+    int fetch_sz;
+    if(Chead == Cci.hd)
+    {
+        return &Cci.C[Coffset];
+    }
+    DEVICE_CODE_FENCE();
+    Cci.hd = Chead;
+#ifndef DEEP_DARK_FANTASY
+    if((gp_i+CI_MSK+1) <= Sci)
+    {
+        fetch_sz = CI_SZ;
+    }
+    else
+    {
+        fetch_sz = (Sci-gp_i);
+    }
+    sync_get(&Cci.C[0], Hci+CI_SZ*Chead, fetch_sz*sizeof(nbnxn_ci_t));
+#else
+    sync_get(&Cci.C[0], Hci+CI_SZ*Chead, CI_SZ*sizeof(nbnxn_ci_t));
+#endif
+    DEVICE_CODE_FENCE();
+    return &Cci.C[Coffset];
 }
 
-#define CJ_GP   (1)
 #define CJ_SZ   (128)
 #define CJ_MSK  (127)
 #define CJ_LOG2 (7)
@@ -274,12 +296,35 @@ typedef struct {
 
 // ===== CACHE =====
 // -----   cj  -----
-
+__thread_local nbnxn_cj_t   *Hcj;
 __thread_local int           Scj; // 1024 B
 __thread_local _cj_cache_t   Ccj;
-static inline _cj_cache_t *cj_C(int idx)
+static inline nbnxn_cj_t *cj_C(unsigned int gp_i)
 {
-
+    int Coffset = M2_MOD(gp_i,CJ_MSK);
+    int Chead   = M2_DIV(gp_i,CJ_LOG2);
+    int fetch_sz;
+    if(Chead == Ccj.hd)
+    {
+        return &Ccj.C[Coffset];
+    }
+    DEVICE_CODE_FENCE();
+    Ccj.hd = Chead;
+#ifndef DEEP_DARK_FANTASY
+    if((gp_i+CJ_MSK+1) <= Scj)
+    {
+        fetch_sz = CJ_SZ;
+    }
+    else
+    {
+        fetch_sz = (Scj-gp_i);
+    }
+    sync_get(&Ccj.C[0], Hcj+CJ_SZ*Chead, fetch_sz*sizeof(nbnxn_cj_t));
+#else
+    sync_get(&Ccj.C[0], Hcj+CJ_SZ*Chead, CJ_SZ*sizeof(nbnxn_cj_t));
+#endif
+    DEVICE_CODE_FENCE();
+    return &Ccj.C[Coffset];
 }
 
 

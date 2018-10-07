@@ -46,7 +46,8 @@
     int write_cj;
 
     //TODO: ldm load: l_cj
-    cj               = l_cj[cjind].cj;
+    //cj               = l_cj[cjind].cj;
+    cj               = Ccj_p->cj;
     write_cj         = IN_F_BLOCK(cj);
 
     if(write_ci || write_cj)
@@ -103,7 +104,8 @@
              * (e.g. because of bonding). */
             int interact;
 
-            interact = ((l_cj[cjind].excl>>(i*UNROLLI + j)) & 1);
+            //interact = ((l_cj[cjind].excl>>(i*UNROLLI + j)) & 1);
+            interact = ((Ccj_p->excl>>(i*UNROLLI + j)) & 1);
 #ifndef EXCL_FORCES
             skipmask = interact;
 #else
