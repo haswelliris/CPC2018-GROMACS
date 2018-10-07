@@ -209,8 +209,12 @@ NBK_FUNC_NAME(_VgrpF)
     // ===== INIT CACHE ===== 
     real *Cxi_p;
     real *Cxj_p;
+
     real *Cqi_p;
     real *Cqj_p;
+
+    int  *Cti_p;
+    int  *Ctj_p;
     {
         clear_C();
         Hxi = x;
@@ -222,6 +226,11 @@ NBK_FUNC_NAME(_VgrpF)
         Sqi = natoms >> 2;
         Hqj = q;
         Sqj = natoms >> 2;
+
+        Hti = type;
+        Sti = natoms >> 2;
+        Htj = type;
+        Stj = natoms >> 2;
     }
     // ===== INIT CACHE =====
 
@@ -323,6 +332,7 @@ NBK_FUNC_NAME(_VgrpF)
         //TODO: ldm load: x, q， func_para_shiftvec
         Cxi_p = xi_C(ci);
         Cqi_p = qi_C(ci);
+        Cti_p = ti_C(ci);
         for (i = 0; i < UNROLLI; i++)
         {
             for (d = 0; d < DIM; d++)

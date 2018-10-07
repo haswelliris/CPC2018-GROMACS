@@ -48,11 +48,13 @@
     //TODO: ldm load: l_cj
     cj               = l_cj[cjind].cj;
     write_cj         = IN_F_BLOCK(cj);
-    Cxj_p = xj_C(cj);
-    Cqj_p = qj_C(cj);
+
     if(write_ci || write_cj)
     {
 
+    Cxj_p = xj_C(cj);
+    Cqj_p = qj_C(cj);
+    Ctj_p = tj_C(cj);
     for (i = 0; i < UNROLLI; i++)
     {
         int ai;
@@ -62,7 +64,8 @@
         ai = ci*UNROLLI + i;
 
         //TODO: ldm load: type
-        type_i_off = type[ai]*ntype2;
+        //type_i_off = type[ai]*ntype2;
+        type_i_off = Cti_p[i]*ntype2;
 
         for (j = 0; j < UNROLLJ; j++)
         {
@@ -178,8 +181,10 @@
 #endif
             {
                 //TODO: ldm load: nbfp
-                c6      = nbfp[type_i_off+type[aj]*2  ];
-                c12     = nbfp[type_i_off+type[aj]*2+1];
+                //c6      = nbfp[type_i_off+type[aj]*2  ];
+                //c12     = nbfp[type_i_off+type[aj]*2+1];
+                c6      = nbfp[type_i_off+Ctj_p[j]*2  ];
+                c12     = nbfp[type_i_off+Ctj_p[j]*2+1];
 
 #if defined LJ_CUT
                 rinvsix = interact*rinvsq*rinvsq*rinvsq;
