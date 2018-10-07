@@ -244,7 +244,8 @@ void *save_realloc(const char *name, const char *file, int line, void *ptr,
 #else
             // 暂时不管realloc
             // 赌一赌搏一搏，单车变摩托
-            p = realloc(ptr, (size_t)size);
+            // p = realloc(ptr, (size_t)size);
+            p = save_realloc_aligned(name,file,line,ptr, (size_t)size,ptr, (size_t)size);
 #endif
         }
         if (p == NULL)
@@ -412,6 +413,10 @@ int over_alloc_dd(int n)
     }
 }
 
-void* save_realloc_aligned() {
+void *save_realloc_aligned(const char *name, const char *file, int line, void* ptr,
+                          size_t size, size_t alignment) {
+    // 剑走偏锋
+    void *real_addr = ptr[-1];
+
 
 }

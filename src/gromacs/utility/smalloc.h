@@ -193,8 +193,8 @@ void *save_calloc_aligned(const char *name, const char *file, int line,
  */
 void save_free_aligned(const char *name, const char *file, int line, void *ptr);
 
-void *save_realloc_aligned(const char *name, const char *file, int line, 
-                          size_t nelem, size_t elsize, size_t alignment);
+void *save_realloc_aligned(const char *name, const char *file, int line, void *ptr,
+                          size_t size, size_t alignment);
 
 #ifdef __cplusplus
 }
