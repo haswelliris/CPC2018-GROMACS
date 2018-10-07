@@ -42,7 +42,6 @@ static inline real *xi_C(unsigned int gp_i)
     DEVICE_CODE_FENCE();
     Cxi.hd = Chead;
 #ifndef DEEP_DARK_FANTASY
-
     if((gp_i+XC_MSK+1) <= Sxi)
     {
         fetch_sz = XC_SZ;
@@ -86,7 +85,6 @@ static inline real *xj_C(unsigned int gp_i)
     DEVICE_CODE_FENCE();
     return &Cxj.C[Coffset*XC_GP];
 }
-
 
 #define QC_GP   (4)
 #ifndef GMX_DOUBLE
