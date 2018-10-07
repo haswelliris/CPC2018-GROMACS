@@ -74,6 +74,11 @@ struct InitParam
 #undef SW_NOCACLU
 
 #define HAHAHAHAHAHAHAHA
+#undef HAHAHAHAHAHAHAHA
+
+#define DEBUG_LB
+
+#define MAX_F_LDM_SIZE 360 // div 12
 // ----
 
 #endif

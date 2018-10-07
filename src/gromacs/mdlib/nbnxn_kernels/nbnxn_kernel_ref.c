@@ -84,6 +84,9 @@ typedef struct {
     real *tabq_coul_F;
     real *tabq_coul_V;
     real *tabq_coul_FDV0;
+
+    int *f_start;
+    int *f_end;
 } func_para_t;
 
 func_para_t host_func_para;
@@ -332,6 +335,51 @@ void deep_copy_nbat(nbnxn_atomdata_t *dst, nbnxn_atomdata_t *src, int new_dst, i
     }
 }
 
+void subcore_loadbalance(nbnxn_atomdata_t *nbat, nbnxn_pairlist_t *nbl, int *f_start, int *f_end)
+{
+    int n, i, device_core_id;
+    int f_count_len = nbat->natoms/4;
+
+	int *f_count = (int*)malloc(f_count_len*sizeof(int));
+	memset(f_count, 0, f_count_len*sizeof(int));
+
+	int tot_work_count = 0, avg_work_load = 0;
+
+	int *workload = (int*)malloc(64*sizeof(int));
+	memset(workload, 0, 64*sizeof(int));
+
+	for (n = 0; n < nbl->nci; n++) {
+	    f_count[nbl->ci[n].ci] += nbl->ci[n].cj_ind_end - nbl->ci[n].cj_ind_start;
+	    tot_work_count += nbl->ci[n].cj_ind_end - nbl->ci[n].cj_ind_start;
+	    for (i = nbl->ci[n].cj_ind_start; i < nbl->ci[n].cj_ind_end; i++) {
+	    	f_count[nbl->cj[i].cj]++;
+	    	tot_work_count++;
+	    }
+	}
+	avg_work_load = tot_work_count/64+1;
+	int p = 0;
+	while (f_count[f_count_len-1] == 0)
+	    f_count_len--;
+    for (device_core_id = 0; device_core_id < 64; device_core_id++) {
+	    while (f_count[p] == 0) p++;
+    	f_start[device_core_id] = p;
+		while (p < f_count_len && 
+    			(workload[device_core_id] < avg_work_load || (f_count_len - p) > (63 - device_core_id)*MAX_F_LDM_SIZE ) && 
+    			(p - f_start[device_core_id]) <= MAX_F_LDM_SIZE)
+    	{
+    		workload[device_core_id]+=f_count[p];
+    		p++;
+    	}
+    	f_end[device_core_id] = p;
+	}
+    // for (device_core_id = 0; device_core_id < 64; device_core_id++) {
+    //     f_start[device_core_id] = BLOCK_HEAD(device_core_id, 64, f_count_len);
+    //     f_end  [device_core_id] = f_start[device_core_id] + BLOCK_SIZE(device_core_id, 64, f_count_len);
+    // }
+    free(f_count);
+    free(workload);
+}
+
 void
 nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                  const nbnxn_atomdata_t     *nbat,
@@ -341,7 +389,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                  int                         clearF,
                  real                       *fshift,
                  real                       *Vc,
-                 real                       *Vvdw)
+                 real                       *Vvdw,
+                 gmx_wallcycle_t             wcycle)
 {
     int                nnbl;
     nbnxn_pairlist_t **nbl;
@@ -412,6 +461,13 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
 #pragma omp parallel for schedule(static) num_threads(nthreads)
     for (nb = 0; nb < nnbl; nb++)
     {
+        int *f_start = (int*)malloc(64*sizeof(int));
+    	memset(f_start, 0, 64*sizeof(int));
+	    int *f_end = (int*)malloc(64*sizeof(int));
+	    memset(f_end, 0, 64*sizeof(int));
+
+        subcore_loadbalance(nbat, nbl[nb], f_start, f_end);
+
         nbnxn_atomdata_output_t *out;
         real                    *fshift_p;
 
@@ -435,7 +491,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                 clear_fshift(fshift_p);
             }
         }
-
+        wallcycle_sub_start(wcycle, ewcsMEMCPY);
         real *expand_fshift = (real*)malloc(SHIFTS*DIM*64*sizeof(real));
 
         real *other_f       = (real*)malloc(nbat->natoms*nbat->fstride*sizeof(real));
@@ -463,6 +519,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         memcpy(other_tabq_coul_F, ic->tabq_coul_F, ic->tabq_size*sizeof(real));
         memcpy(other_tabq_coul_V, ic->tabq_coul_V, ic->tabq_size*sizeof(real));
 #endif
+        wallcycle_sub_stop(wcycle, ewcsMEMCPY);
         // if the tabq_coul_FDV0 can load to LDM?
         // TLOG("tabq_coul_FDV0_SZ =%d Byte\n", ic->tabq_size*4*sizeof(real));
         // TLOG("tabq_size =%d, ntype =%d, natoms =%d\n", ic->tabq_size, nbat->ntype, nbat->natoms);
@@ -487,6 +544,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_func_para.tabq_coul_F = other_tabq_coul_F;// read only
             host_func_para.tabq_coul_V = other_tabq_coul_V;// read only
             host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;// read only
+            host_func_para.f_start = f_start;
+            host_func_para.f_end   = f_end;
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
@@ -526,6 +585,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_func_para.tabq_coul_F = other_tabq_coul_F;
             host_func_para.tabq_coul_V = other_tabq_coul_V;
             host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;
+            host_func_para.f_start = f_start;
+            host_func_para.f_end   = f_end;
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
@@ -614,6 +675,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_func_para.tabq_coul_F = other_tabq_coul_F;
             host_func_para.tabq_coul_V = other_tabq_coul_V;
             host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;
+            host_func_para.f_start = f_start;
+            host_func_para.f_end   = f_end;
 #ifdef SW_HOST_LOG /* in SwConfig */
             if((host_param.host_rank + host_notice_counter) % 64 == 0)
             {
@@ -690,6 +753,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         TLOG("MOee 4.\n");
         wait_device();
 #endif
+        wallcycle_sub_start(wcycle, ewcsMEMCPY);
         memcpy(out->f, other_f, nbat->natoms*nbat->fstride*sizeof(real));
         free(other_f);
 
@@ -708,6 +772,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         free(other_tabq_coul_F);
         free(other_tabq_coul_V);
 #endif
+        wallcycle_sub_stop(wcycle, ewcsMEMCPY);
+        free(f_start);
+        free(f_end);
 #ifdef DEBUG_FPEX
         TLOG("MOee 6.\n");
         wait_device();

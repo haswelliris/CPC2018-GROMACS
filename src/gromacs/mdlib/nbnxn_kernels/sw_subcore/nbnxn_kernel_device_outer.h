@@ -158,6 +158,52 @@ NBK_FUNC_NAME(_VgrpF)
     async_get(&ic, device_func_para.ic, sizeof(interaction_const_t));
     wait_all_async_get();
 
+
+    // ========== GET MY WORKOAD =========== {
+    int natoms = nbat.natoms;
+    int fstride = nbat.fstride;
+    int sizeof_f = natoms*fstride;
+    int sizeof_f_div_12 = sizeof_f/12;
+    int sizeof_fshift = SHIFTS*DIM; // 135 * sizeof(float)
+
+    // int start_f_div_12 = BLOCK_HEAD(device_core_id, 64, sizeof_f_div_12);
+    // int start_f = start_f_div_12*12;
+    // int sz_f_div_12 = BLOCK_SIZE(device_core_id, 64, sizeof_f_div_12);
+    // int sz_f = sz_f_div_12*12;
+    // int end_f_div_12 = start_f_div_12 + sz_f_div_12;
+    // int end_f = end_f_div_12*12;
+    int start_f_div_12 = device_func_para.f_start[device_core_id];
+    int start_f = start_f_div_12*12;
+    int end_f_div_12 = device_func_para.f_end[device_core_id];
+    int end_f = end_f_div_12*12; 
+    int sz_f_div_12 = end_f_div_12-start_f_div_12;
+    int sz_f = end_f-start_f;
+
+#ifdef CALC_SHIFTFORCES
+    real  ldm_fshift[SHIFTS*DIM];
+#endif
+    real  ldm_Vvdw = 0;
+    real  ldm_Vc = 0;
+
+    if(sz_f == 0)
+    {
+#ifdef CALC_SHIFTFORCES
+        if (device_func_para.expand_fshift != NULL)
+        {
+            memset(ldm_fshift, 0, SHIFTS*DIM*sizeof(real));
+            //memcpy(device_func_para.expand_fshift+device_core_id*SHIFTS*DIM, ldm_fshift, SHIFTS*DIM*sizeof(real));
+            sync_put(device_func_para.expand_fshift+device_core_id*SHIFTS*DIM, ldm_fshift, SHIFTS*DIM*sizeof(real));
+        }
+#endif
+#ifdef CALC_ENERGIES
+        device_func_para.expand_Vvdw[device_core_id] = ldm_Vvdw;
+        device_func_para.expand_Vc  [device_core_id] = ldm_Vc;
+#endif
+        return;
+    }
+
+    // ========== GET MY WORKOAD =========== }
+
     // =========== INIT DATA =============
     real cpot = ic.repulsion_shift.cpot;
 #ifdef CALC_COUL_RF
@@ -209,19 +255,6 @@ NBK_FUNC_NAME(_VgrpF)
     //wait_host(device_core_id);
 #endif
 
-    int natoms = nbat.natoms;
-    int fstride = nbat.fstride;
-    int sizeof_f = natoms*fstride;
-    int sizeof_f_div_12 = sizeof_f/12;
-    int sizeof_fshift = SHIFTS*DIM; // 135 * sizeof(float)
-
-    int start_f_div_12 = BLOCK_HEAD(device_core_id, 64, sizeof_f_div_12);
-    int start_f = start_f_div_12*12;
-    int sz_f_div_12 = BLOCK_SIZE(device_core_id, 64, sizeof_f_div_12);
-    int sz_f = sz_f_div_12*12;
-    int end_f_div_12 = start_f_div_12 + sz_f_div_12;
-    int end_f = end_f_div_12*12;
-
     // ===== INIT CACHE ===== 
     real *Cxi_p;
     real *Cxj_p;
@@ -268,22 +301,20 @@ NBK_FUNC_NAME(_VgrpF)
     nbfp = (real*)device_align(unaligned_nbfp, 64, 0);
     DEVICE_CODE_FENCE();
     async_get(nbfp, nbat.nbfp, nbat.ntype*nbat.ntype*2*sizeof(real));
-#ifdef CALC_SHIFTFORCES
-    real  ldm_fshift[SHIFTS*DIM];
-#endif
-    real* ldm_f;
-    real  ldm_Vvdw = 0;
-    real  ldm_Vc = 0;
 
+    // ================ malloc ldm_f ===================
     //ldm_f = (real*)malloc(sz_f*sizeof(real));
     /* FIXED: SEEMS NOT ENOUGH MEMORY */
-    void *unaligned_ldm_f = device_malloc(sz_f*sizeof(real)+DEVICE_SAFE_PAD);
-    if(unaligned_ldm_f == NULL)
-    {
-        ALOG("Not enough MEM.\n");
-        return;
-    }
-    ldm_f = (real*)device_align(unaligned_ldm_f, 64, 0);
+    // void *unaligned_ldm_f = device_malloc(sz_f*sizeof(real)+DEVICE_SAFE_PAD);
+    // if(unaligned_ldm_f == NULL)
+    // {
+    //     ALOG("Not enough MEM.\n");
+    //     return;
+    // }
+    // ldm_f = (real*)device_align(unaligned_ldm_f, 64, 0);
+#ifdef DEBUG_LB
+    //wait_host(device_core_id);
+#endif
     DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 3.\n");
@@ -298,7 +329,13 @@ NBK_FUNC_NAME(_VgrpF)
     //wait_host(device_core_id);
 #endif
     //memcpy(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    //if(device_param.host_rank == 0 && device_core_id ==0 )
+    //if(sz_f != 0)
     async_get(ldm_f, device_func_para.f + start_f, sz_f*sizeof(real));
+    //sync_get(ldm_f, device_func_para.f + start_f, 0);     <-------- THIS WILL CAUSE ERROR
+#ifdef DEBUG_LB
+    //wait_host(device_core_id);
+#endif
     async_get(&func_para_shiftvec[0], device_func_para.shift_vec[0], SHIFTS*DIM*sizeof(real));
 
 #ifdef CALC_SHIFTFORCES /* Always*/
@@ -526,6 +563,7 @@ NBK_FUNC_NAME(_VgrpF)
     DEVICE_CODE_FENCE();
 #endif /* SW_NOCACLU */
     //memcpy(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
+    //if(sz_f != 0)
     async_put(device_func_para.f + start_f, ldm_f, sz_f*sizeof(real));
     DEVICE_CODE_FENCE();
 
@@ -557,7 +595,7 @@ NBK_FUNC_NAME(_VgrpF)
     wait_all_async_put();
 #endif
     //free(ldm_f);
-    device_free(unaligned_ldm_f, sz_f*sizeof(real)+DEVICE_SAFE_PAD);
+    //device_free(unaligned_ldm_f, sz_f*sizeof(real)+DEVICE_SAFE_PAD);
 #undef IN_F_BLOCK
 }
 

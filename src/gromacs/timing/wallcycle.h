@@ -77,6 +77,7 @@ enum {
     ewcsEWALD_CORRECTION,
     ewcsNB_X_BUF_OPS,
     ewcsNB_F_BUF_OPS,
+    ewcsMEMCPY,
     ewcsNR
 };
 

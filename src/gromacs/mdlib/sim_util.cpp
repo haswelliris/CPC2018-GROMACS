@@ -497,7 +497,8 @@ static void do_nb_verlet(t_forcerec *fr,
                              enerd->grpp.ener[egCOULSR],
                              fr->bBHAM ?
                              enerd->grpp.ener[egBHAMSR] :
-                             enerd->grpp.ener[egLJSR]);
+                             enerd->grpp.ener[egLJSR],
+                             wcycle);
             break;
 
         case nbnxnk4xN_SIMD_4xN:

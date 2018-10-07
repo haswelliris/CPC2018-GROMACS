@@ -38,6 +38,7 @@
 
 #include "gromacs/legacyheaders/typedefs.h"
 #include "gromacs/mdlib/nbnxn_pairlist.h"
+#include "gromacs/timing/wallcycle.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,7 +54,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                  int                         clearF,
                  real                       *fshift,
                  real                       *Vc,
-                 real                       *Vvdw);
+                 real                       *Vvdw,
+                 gmx_wallcycle_t             wcycle);
 
 #ifdef __cplusplus
 }

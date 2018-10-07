@@ -412,9 +412,13 @@ typedef struct {
     real *tabq_coul_F;
     real *tabq_coul_V;
     real *tabq_coul_FDV0;
+    
+    int *f_start;
+    int *f_end;
 } func_para_t;
 
 __thread_local func_para_t device_func_para;
+__thread_local real        ldm_f[MAX_F_LDM_SIZE*12];
 
 /* Analytical reaction-field kernels */
 //++++++++++++++++++++++++++++++++++++
