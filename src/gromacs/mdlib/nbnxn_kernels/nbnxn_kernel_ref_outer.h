@@ -188,14 +188,14 @@ NBK_FUNC_NAME(_VgrpF)
     int device_core_id;
 
     // fake subcore
-    for (device_core_id = 0; device_core_id < 64; device_core_id++)
-        subcore_func(&workLoadPara_host, device_core_id);
+    // for (device_core_id = 0; device_core_id < 64; device_core_id++)
+    //     subcore_func(&workLoadPara_host, device_core_id);
 
     // real subcore
-    // host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara_host;
-    // host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
-    // notice_device();
-    // wait_device();
+    host_param.host_to_device[WORKLOADPARA] = (long)&workLoadPara_host;
+    host_param.host_to_device[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+    notice_device();
+    wait_device();
     // printf("done!\n");
     // exit(0);
 

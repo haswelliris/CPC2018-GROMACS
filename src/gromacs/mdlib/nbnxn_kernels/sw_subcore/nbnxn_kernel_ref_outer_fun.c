@@ -1,8 +1,8 @@
 #include "nbnxn_kernel_ref_outer_fun.h"
 #include "SwConfig.h"
+#include <string.h>
 
 #ifdef HOST_RUN
-	#include <string.h>
 	#define aget_mem(A, B, C) memcpy(A, B, C)
 	#define sget_mem(A, B, C) memcpy(A, B, C)
 	#define put_mem(A, B, C) memcpy(A, B, C)
@@ -146,8 +146,6 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 		wait_all_async_get();
 	#endif
 
-#ifdef HOST_RUN
-
 
 	// end load obj
 
@@ -223,6 +221,8 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 	// end init
 
     // printf("%d\n", nbl.ncj);
+
+// #ifdef HOST_RUN
 
 	for (n = 0; n < nbl.nci; n++)
 	// int task_num = BLOCK_SIZE(device_core_id, 64, nbl.nci);
@@ -314,11 +314,11 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 
 						/* Coulomb self interaction */
 						if (BLOCK_HINT(ci*UNROLLI*F_STRIDE, f_start, f_end))
-							Vc[egp_ind]   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
+							Vc_local/*[egp_ind]*/   -= qi[i]*q[ci*UNROLLI+i]*Vc_sub_self;
 
 						if (macro_has(para_LJ_EWALD)) {
 							/* LJ Ewald self interaction */
-							Vvdw[egp_ind] += 0.5*nbat.nbfp[nbat.type[ci*UNROLLI+i]*(nbat.ntype + 1)*2]/6*lje_coeff6_6;
+							Vvdw_local/*[egp_ind]*/ += 0.5*nbat.nbfp[nbat.type[ci*UNROLLI+i]*(nbat.ntype + 1)*2]/6*lje_coeff6_6;
 						}
 					}
 				}
@@ -412,5 +412,6 @@ void subcore_func(struct WorkLoadPara *workLoadPara_pass)
 	put_mem(workLoadPara.fshift_host + device_core_id*SHIFTS*DIM, fshift_local, sizeof(fshift_local));
 	put_mem(workLoadPara.Vvdw_host+device_core_id, &Vvdw_local, sizeof(real));
 	put_mem(workLoadPara.Vc_host+device_core_id, &Vc_local, sizeof(real));
-	#endif
+	// #endif
 }
+

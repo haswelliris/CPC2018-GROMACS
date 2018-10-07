@@ -61,6 +61,7 @@ nbnxn_pairlist_t* deep_copy_nbl(nbnxn_pairlist_t *src, int new_or_delete)
     {
         nbnxn_pairlist_t *dst;
         dst = (nbnxn_pairlist_t*)malloc(sizeof(nbnxn_pairlist_t));
+        *dst = *(src);
         dst->ci = (nbnxn_ci_t*)malloc(src->nci*sizeof(nbnxn_ci_t));
         dst->cj = (nbnxn_cj_t*)malloc(src->ncj*sizeof(nbnxn_cj_t));
 
@@ -85,6 +86,7 @@ nbnxn_atomdata_t* deep_copy_nbat(nbnxn_atomdata_t *src, int new_or_delete)
     {
         nbnxn_atomdata_t *dst;
         dst = (nbnxn_atomdata_t*)malloc(sizeof(nbnxn_atomdata_t));
+        *dst = *(src);
         dst->x = (real*)malloc(src->natoms*src->xstride*sizeof(real));
         dst->q = (real*)malloc(src->natoms*sizeof(real));
         dst->nbfp = (real*)malloc(src->ntype*src->ntype*2*sizeof(real));
