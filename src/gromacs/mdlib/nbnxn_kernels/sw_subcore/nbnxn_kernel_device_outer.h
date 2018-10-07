@@ -229,6 +229,7 @@ NBK_FUNC_NAME(_VgrpF)
     real *Cqi_p;
     real *Cqj_p;
 
+
     int  *Cti_p;
     int  *Ctj_p;
 
@@ -240,6 +241,7 @@ NBK_FUNC_NAME(_VgrpF)
         Sxi = sizeof_f_div_12;
         Hxj = x;
         Sxj = sizeof_f_div_12;
+
 
         Hqi = q;
         Sqi = natoms >> 2;
@@ -370,7 +372,9 @@ NBK_FUNC_NAME(_VgrpF)
         //TODO: ldm load: x, q， func_para_shiftvec
         Cxi_p = xi_C(ci);
         Cqi_p = qi_C(ci);
+
         Cti_p = ti_C(ci);
+
         for (i = 0; i < UNROLLI; i++)
         {
             for (d = 0; d < DIM; d++)
