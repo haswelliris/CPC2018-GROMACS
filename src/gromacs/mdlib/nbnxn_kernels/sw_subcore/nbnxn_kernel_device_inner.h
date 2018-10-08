@@ -156,18 +156,22 @@
             // dx  = xi[i*XI_STRIDE+XX] - Cxj_p[j*X_STRIDE+XX];
             // dy  = xi[i*XI_STRIDE+YY] - Cxj_p[j*X_STRIDE+YY];
             // dz  = xi[i*XI_STRIDE+ZZ] - Cxj_p[j*X_STRIDE+ZZ];
-            dx.p[0]  = xiX.p[0] - xjX.p[0];
-            dy.p[0]  = xiY.p[0] - xjY.p[0];
-            dz.p[0]  = xiZ.p[0] - xjZ.p[0];
-            dx.p[1]  = xiX.p[1] - xjX.p[1];
-            dy.p[1]  = xiY.p[1] - xjY.p[1];
-            dz.p[1]  = xiZ.p[1] - xjZ.p[1];
-            dx.p[2]  = xiX.p[2] - xjX.p[2];
-            dy.p[2]  = xiY.p[2] - xjY.p[2];
-            dz.p[2]  = xiZ.p[2] - xjZ.p[2];
-            dx.p[3]  = xiX.p[3] - xjX.p[3];
-            dy.p[3]  = xiY.p[3] - xjY.p[3];
-            dz.p[3]  = xiZ.p[3] - xjZ.p[3];
+
+            // dx.p[0]  = xiX.p[0] - xjX.p[0];
+            // dy.p[0]  = xiY.p[0] - xjY.p[0];
+            // dz.p[0]  = xiZ.p[0] - xjZ.p[0];
+            // dx.p[1]  = xiX.p[1] - xjX.p[1];
+            // dy.p[1]  = xiY.p[1] - xjY.p[1];
+            // dz.p[1]  = xiZ.p[1] - xjZ.p[1];
+            // dx.p[2]  = xiX.p[2] - xjX.p[2];
+            // dy.p[2]  = xiY.p[2] - xjY.p[2];
+            // dz.p[2]  = xiZ.p[2] - xjZ.p[2];
+            // dx.p[3]  = xiX.p[3] - xjX.p[3];
+            // dy.p[3]  = xiY.p[3] - xjY.p[3];
+            // dz.p[3]  = xiZ.p[3] - xjZ.p[3];
+            dx.v  = xiX.v - xjX.v;
+            dy.v  = xiY.v - xjY.v;
+            dz.v  = xiZ.v - xjZ.v;
 #ifdef DEBUG_CACHE
             if(x[aj*X_STRIDE+XX] != Cxj_p[j*X_STRIDE+XX])
             {
@@ -184,10 +188,11 @@
 #endif
 
             //rsq = dx*dx + dy*dy + dz*dz;
-            rsq.p[0] = dx.p[0]*dx.p[0] + dy.p[0]*dy.p[0] + dz.p[0]*dz.p[0];
-            rsq.p[1] = dx.p[1]*dx.p[1] + dy.p[1]*dy.p[1] + dz.p[1]*dz.p[1];
-            rsq.p[2] = dx.p[2]*dx.p[2] + dy.p[2]*dy.p[2] + dz.p[2]*dz.p[2];
-            rsq.p[3] = dx.p[3]*dx.p[3] + dy.p[3]*dy.p[3] + dz.p[3]*dz.p[3];
+            // rsq.p[0] = dx.p[0]*dx.p[0] + dy.p[0]*dy.p[0] + dz.p[0]*dz.p[0];
+            // rsq.p[1] = dx.p[1]*dx.p[1] + dy.p[1]*dy.p[1] + dz.p[1]*dz.p[1];
+            // rsq.p[2] = dx.p[2]*dx.p[2] + dy.p[2]*dy.p[2] + dz.p[2]*dz.p[2];
+            // rsq.p[3] = dx.p[3]*dx.p[3] + dy.p[3]*dy.p[3] + dz.p[3]*dz.p[3];
+            rsq.v = dx.v*dx.v + dy.v*dy.v + dz.v*dz.v;
 
 #ifdef DEBUG_FPEX
             TLOG("xiX =%f, xiY =%f, xiZ =%f\n", xi[i*XI_STRIDE+XX], xi[i*XI_STRIDE+YY], xi[i*XI_STRIDE+ZZ]);
@@ -203,6 +208,7 @@
             skipmask.p[1] = (rsq.p[1] >= rcut2) ? 0.0 : skipmask.p[1];
             skipmask.p[2] = (rsq.p[2] >= rcut2) ? 0.0 : skipmask.p[2];
             skipmask.p[3] = (rsq.p[3] >= rcut2) ? 0.0 : skipmask.p[3];
+            // skipmask.v = simd_vsellt(rsq.v - rcut2, skipmask.v, zero.v);
             ////DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.2.\n");
@@ -214,17 +220,19 @@
              * we add a small number to rsq for excluded pairs only.
              */
             //rsq += (1 - interact)*NBNXN_AVOID_SING_R2_INC;
-            rsq.p[0] += (1.0 - interact.p[0])*NBNXN_AVOID_SING_R2_INC;
-            rsq.p[1] += (1.0 - interact.p[1])*NBNXN_AVOID_SING_R2_INC;
-            rsq.p[2] += (1.0 - interact.p[2])*NBNXN_AVOID_SING_R2_INC;
-            rsq.p[3] += (1.0 - interact.p[3])*NBNXN_AVOID_SING_R2_INC;
+            // rsq.p[0] += (1.0 - interact.p[0])*NBNXN_AVOID_SING_R2_INC;
+            // rsq.p[1] += (1.0 - interact.p[1])*NBNXN_AVOID_SING_R2_INC;
+            // rsq.p[2] += (1.0 - interact.p[2])*NBNXN_AVOID_SING_R2_INC;
+            // rsq.p[3] += (1.0 - interact.p[3])*NBNXN_AVOID_SING_R2_INC;
+            rsq.v += (1.0 - interact.v)*NBNXN_AVOID_SING_R2_INC;
 #endif
 
             //rinv = gmx_invsqrt(rsq);
-            rinv.p[0] = gmx_invsqrt(rsq.p[0]);
-            rinv.p[1] = gmx_invsqrt(rsq.p[1]);
-            rinv.p[2] = gmx_invsqrt(rsq.p[2]);
-            rinv.p[3] = gmx_invsqrt(rsq.p[3]);
+            // rinv.p[0] = gmx_invsqrt(rsq.p[0]);
+            // rinv.p[1] = gmx_invsqrt(rsq.p[1]);
+            // rinv.p[2] = gmx_invsqrt(rsq.p[2]);
+            // rinv.p[3] = gmx_invsqrt(rsq.p[3]);
+            rinv.v = 1.0/simd_vsqrt(rsq.v);
             /* 5 flops for invsqrt */
 
             /* Partially enforce the cut-off (and perhaps
@@ -236,12 +244,16 @@
             rinv.p[1] = rinv.p[1] * skipmask.p[1];
             rinv.p[2] = rinv.p[2] * skipmask.p[2];
             rinv.p[3] = rinv.p[3] * skipmask.p[3];
+            // FIXME !!!!!!!!
+            // rinv.v = rinv.v * skipmask.v;
 
             //rinvsq  = rinv*rinv;
             rinvsq.p[0]  = rinv.p[0]*rinv.p[0];
             rinvsq.p[1]  = rinv.p[1]*rinv.p[1];
             rinvsq.p[2]  = rinv.p[2]*rinv.p[2];
             rinvsq.p[3]  = rinv.p[3]*rinv.p[3];
+            // FIXME !!!!!!!!
+            // rinvsq.v  = rinv.v*rinv.v;
 
 #ifdef HALF_LJ
             if (i < UNROLLI/2)
@@ -270,21 +282,28 @@
                 rinvsix.p[1] = interact.p[1]*rinvsq.p[1]*rinvsq.p[1]*rinvsq.p[1];
                 rinvsix.p[2] = interact.p[2]*rinvsq.p[2]*rinvsq.p[2]*rinvsq.p[2];
                 rinvsix.p[3] = interact.p[3]*rinvsq.p[3]*rinvsq.p[3]*rinvsq.p[3];
+                // FIXME !!!!!!!!
+                // rinvsix.v = interact.v*rinvsq.v*rinvsq.v*rinvsq.v;
                 //FrLJ6   = c6*rinvsix;
                 FrLJ6.p[0]   = c6.p[0]*rinvsix.p[0];
                 FrLJ6.p[1]   = c6.p[1]*rinvsix.p[1];
                 FrLJ6.p[2]   = c6.p[2]*rinvsix.p[2];
                 FrLJ6.p[3]   = c6.p[3]*rinvsix.p[3];
+                // FIXME !!!!!!!!
+                // FrLJ6.v   = c6.v*rinvsix.v;
                 //FrLJ12  = c12*rinvsix*rinvsix;
                 FrLJ12.p[0]  = c12.p[0]*rinvsix.p[0]*rinvsix.p[0];
                 FrLJ12.p[1]  = c12.p[1]*rinvsix.p[1]*rinvsix.p[1];
                 FrLJ12.p[2]  = c12.p[2]*rinvsix.p[2]*rinvsix.p[2];
                 FrLJ12.p[3]  = c12.p[3]*rinvsix.p[3]*rinvsix.p[3];
+                // FrLJ12.v  = c12.v*rinvsix.v*rinvsix.v;
                 //frLJ    = FrLJ12 - FrLJ6;
                 frLJ.p[0]    = FrLJ12.p[0] - FrLJ6.p[0];
                 frLJ.p[1]    = FrLJ12.p[1] - FrLJ6.p[1];
                 frLJ.p[2]    = FrLJ12.p[2] - FrLJ6.p[2];
                 frLJ.p[3]    = FrLJ12.p[3] - FrLJ6.p[3];
+                // FIXME !!!!!!!!
+                // frLJ.v    = FrLJ12.v - FrLJ6.v;
                 /* 7 flops for r^-2 + LJ force */
 #if defined CALC_ENERGIES
                 //VLJ     = (FrLJ12 + c12*cpot)/12 - (FrLJ6 + c6*cpot)/6;
@@ -292,6 +311,7 @@
                 VLJ.p[1]     = (FrLJ12.p[1] + c12.p[1]*cpot)/12 - (FrLJ6.p[1] + c6.p[1]*cpot)/6;
                 VLJ.p[2]     = (FrLJ12.p[2] + c12.p[2]*cpot)/12 - (FrLJ6.p[2] + c6.p[2]*cpot)/6;
                 VLJ.p[3]     = (FrLJ12.p[3] + c12.p[3]*cpot)/12 - (FrLJ6.p[3] + c6.p[3]*cpot)/6;
+                // VLJ.v     = (FrLJ12.v + c12.v*cpot)/12 - (FrLJ6.v + c6.v*cpot)/6;
                 /* 7 flops for LJ energy */
 #endif
 #endif
@@ -311,6 +331,7 @@
                 VLJ.p[1]     = VLJ.p[1] * interact.p[1];
                 VLJ.p[2]     = VLJ.p[2] * interact.p[2];
                 VLJ.p[3]     = VLJ.p[3] * interact.p[3];
+                // VLJ.v     = VLJ.v * interact.v;
 #endif
 
 #if defined CALC_ENERGIES
@@ -320,6 +341,7 @@
                 VLJ.p[1]     = VLJ.p[1] * skipmask.p[1];
                 VLJ.p[2]     = VLJ.p[2] * skipmask.p[2];
                 VLJ.p[3]     = VLJ.p[3] * skipmask.p[3];
+                // VLJ.v     = VLJ.v * skipmask.v;
                 /* 1 more flop for LJ energy */
 #endif
 
@@ -347,6 +369,13 @@
             qq.p[1] = skipmask.p[1] * qi[i] * Cqj_p[1];
             qq.p[2] = skipmask.p[2] * qi[i] * Cqj_p[2];
             qq.p[3] = skipmask.p[3] * qi[i] * Cqj_p[3];
+            // realv4 qiV, qjV;
+            // qiV.v = qi[i];
+            // qjV.p[0] = Cqj_p[0];
+            // qjV.p[1] = Cqj_p[1];
+            // qjV.p[2] = Cqj_p[2];
+            // qjV.p[3] = Cqj_p[3];
+            // qq.v = skipmask.v * qiV.v * qjV.v;
 
 #ifdef CALC_COUL_RF
             //fcoul  = qq*(interact*rinv*rinvsq - k_rf2);
@@ -354,6 +383,7 @@
             fcoul.p[1]  = qq.p[1]*(interact.p[1]*rinv.p[1]*rinvsq.p[1] - k_rf2);
             fcoul.p[2]  = qq.p[2]*(interact.p[2]*rinv.p[2]*rinvsq.p[2] - k_rf2);
             fcoul.p[3]  = qq.p[3]*(interact.p[3]*rinv.p[3]*rinvsq.p[3] - k_rf2);
+            // fcoul.v  = qq.v*(interact.v*rinv.v*rinvsq.v - k_rf2);
             /* 4 flops for RF force */
 #ifdef CALC_ENERGIES
             //vcoul  = qq*(interact*rinv + k_rf*rsq - c_rf);
@@ -361,6 +391,7 @@
             vcoul.p[1]  = qq.p[1]*(interact.p[1]*rinv.p[1] + k_rf*rsq.p[1] - c_rf);
             vcoul.p[2]  = qq.p[2]*(interact.p[2]*rinv.p[2] + k_rf*rsq.p[2] - c_rf);
             vcoul.p[3]  = qq.p[3]*(interact.p[3]*rinv.p[3] + k_rf*rsq.p[3] - c_rf);
+            // vcoul.v  = qq.v*(interact.v*rinv.v + k_rf*rsq.v - c_rf);
             /* 4 flops for RF energy */
 #endif // CALC_ENERGIES
 #endif // CALC_COUL_RF
@@ -375,6 +406,7 @@
             rs.p[1]     = rsq.p[1]*rinv.p[1]*ic.tabq_scale;
             rs.p[2]     = rsq.p[2]*rinv.p[2]*ic.tabq_scale;
             rs.p[3]     = rsq.p[3]*rinv.p[3]*ic.tabq_scale;
+            // rs.v     = rsq.v*rinv.v*ic.tabq_scale;
             //ri     = (int)rs;
             ri[0]     = (int)rs.p[0];
             ri[1]     = (int)rs.p[1];
@@ -439,6 +471,7 @@
             fcoul.p[1]  = interact.p[1]*rinvsq.p[1] - fexcl.p[1];
             fcoul.p[2]  = interact.p[2]*rinvsq.p[2] - fexcl.p[2];
             fcoul.p[3]  = interact.p[3]*rinvsq.p[3] - fexcl.p[3];
+            //fcoul.v  = interact.v*rinvsq.v-fexcl.v;
             /* 7 flops for float 1/r-table force */
 #ifdef CALC_ENERGIES
             ////DEVICE_CODE_FENCE();
@@ -450,6 +483,8 @@
             // vcoul  = qq*(interact*(rinv - ic.sh_ewald)
             //              -(tab_coul_FDV0[ri*4+2]
             //                -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
+
+
             vcoul.p[0]  = qq.p[0]*(interact.p[0]*(rinv.p[0] - ic.sh_ewald)
                          -(V.p[0]
                            -halfsp*frac.p[0]*(F.p[0] + fexcl.p[0])));
@@ -462,6 +497,12 @@
             vcoul.p[3]  = qq.p[3]*(interact.p[3]*(rinv.p[3] - ic.sh_ewald)
                          -(V.p[3]
                            -halfsp*frac.p[3]*(F.p[3] + fexcl.p[3])));
+            // Unaligned EX
+            // vcoul.v  = qq.v*(interact.v*(rinv.v - ic.sh_ewald)
+            //              -(V.v
+            //                -halfsp*frac.v*(F.v + fexcl.v)));
+
+                           
             // vcoul  = qq*(interact*(rinv - ic.sh_ewald)
             //              -(tab_coul_FDV0[ri*2+1]
             //                -halfsp*frac*(tab_coul_FDV0[ri*2] + fexcl)));
@@ -473,10 +514,11 @@
 #endif // GMX_DOUBLE
 #endif // CALC_ENERGIES
             //fcoul *= qq*rinv;
-            fcoul.p[0] *= qq.p[0]*rinv.p[0];
-            fcoul.p[1] *= qq.p[1]*rinv.p[1];
-            fcoul.p[2] *= qq.p[2]*rinv.p[2];
-            fcoul.p[3] *= qq.p[3]*rinv.p[3];
+            // fcoul.p[0] *= qq.p[0]*rinv.p[0];
+            // fcoul.p[1] *= qq.p[1]*rinv.p[1];
+            // fcoul.p[2] *= qq.p[2]*rinv.p[2];
+            // fcoul.p[3] *= qq.p[3]*rinv.p[3];
+            fcoul.v *= qq.v*rinv.v;
 #endif // CALC_COUL_TAB
             ////DEVICE_CODE_FENCE();
 #ifdef CALC_ENERGIES
@@ -500,44 +542,50 @@
 #endif
             {
                 //fscal = frLJ*rinvsq + fcoul;
-                fscal.p[0] = frLJ.p[0]*rinvsq.p[0] + fcoul.p[0];
-                fscal.p[1] = frLJ.p[1]*rinvsq.p[1] + fcoul.p[1];
-                fscal.p[2] = frLJ.p[2]*rinvsq.p[2] + fcoul.p[2];
-                fscal.p[3] = frLJ.p[3]*rinvsq.p[3] + fcoul.p[3];
+                // fscal.p[0] = frLJ.p[0]*rinvsq.p[0] + fcoul.p[0];
+                // fscal.p[1] = frLJ.p[1]*rinvsq.p[1] + fcoul.p[1];
+                // fscal.p[2] = frLJ.p[2]*rinvsq.p[2] + fcoul.p[2];
+                // fscal.p[3] = frLJ.p[3]*rinvsq.p[3] + fcoul.p[3];
+                fscal.v = frLJ.v*rinvsq.v+fcoul.v;
                 /* 2 flops for scalar LJ+Coulomb force */
             }
 #ifdef HALF_LJ
             else
             {
                 //fscal = fcoul;
-                fscal.p[0] = fcoul.p[0];
-                fscal.p[1] = fcoul.p[1];
-                fscal.p[2] = fcoul.p[2];
-                fscal.p[3] = fcoul.p[3];
+                // fscal.p[0] = fcoul.p[0];
+                // fscal.p[1] = fcoul.p[1];
+                // fscal.p[2] = fcoul.p[2];
+                // fscal.p[3] = fcoul.p[3];
+                fscal.v = fcoul.v;
             }
 #endif
 #else
             //fscal = frLJ*rinvsq;
-            fscal.p[0] = frLJ.p[0]*rinvsq.p[0];
-            fscal.p[1] = frLJ.p[1]*rinvsq.p[1];
-            fscal.p[2] = frLJ.p[2]*rinvsq.p[2];
-            fscal.p[3] = frLJ.p[3]*rinvsq.p[3];
+            // fscal.p[0] = frLJ.p[0]*rinvsq.p[0];
+            // fscal.p[1] = frLJ.p[1]*rinvsq.p[1];
+            // fscal.p[2] = frLJ.p[2]*rinvsq.p[2];
+            // fscal.p[3] = frLJ.p[3]*rinvsq.p[3];
+            fscal.v = frLJ.v*rinvsq.v;
 #endif
             // fx = fscal*dx;
             // fy = fscal*dy;
             // fz = fscal*dz;
-            fx.p[0] = fscal.p[0]*dx.p[0];
-            fy.p[0] = fscal.p[0]*dy.p[0];
-            fz.p[0] = fscal.p[0]*dz.p[0];
-            fx.p[1] = fscal.p[1]*dx.p[1];
-            fy.p[1] = fscal.p[1]*dy.p[1];
-            fz.p[1] = fscal.p[1]*dz.p[1];
-            fx.p[2] = fscal.p[2]*dx.p[2];
-            fy.p[2] = fscal.p[2]*dy.p[2];
-            fz.p[2] = fscal.p[2]*dz.p[2];
-            fx.p[3] = fscal.p[3]*dx.p[3];
-            fy.p[3] = fscal.p[3]*dy.p[3];
-            fz.p[3] = fscal.p[3]*dz.p[3];
+            // fx.p[0] = fscal.p[0]*dx.p[0];
+            // fy.p[0] = fscal.p[0]*dy.p[0];
+            // fz.p[0] = fscal.p[0]*dz.p[0];
+            // fx.p[1] = fscal.p[1]*dx.p[1];
+            // fy.p[1] = fscal.p[1]*dy.p[1];
+            // fz.p[1] = fscal.p[1]*dz.p[1];
+            // fx.p[2] = fscal.p[2]*dx.p[2];
+            // fy.p[2] = fscal.p[2]*dy.p[2];
+            // fz.p[2] = fscal.p[2]*dz.p[2];
+            // fx.p[3] = fscal.p[3]*dx.p[3];
+            // fy.p[3] = fscal.p[3]*dy.p[3];
+            // fz.p[3] = fscal.p[3]*dz.p[3];
+            fx.v = fscal.v*dx.v;
+            fy.v = fscal.v*dy.v;
+            fz.v = fscal.v*dz.v;
 
             /* Increment i-atom force */
             ////DEVICE_CODE_FENCE();

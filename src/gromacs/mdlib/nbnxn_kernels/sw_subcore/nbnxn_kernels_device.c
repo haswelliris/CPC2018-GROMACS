@@ -24,10 +24,10 @@ typedef struct {
 } _x_cache_t;
 
 __thread_local real      *Hxi;      
-__thread_local _x_cache_t Cxi; // 1536 B
+__thread_local _x_cache_t Cxi __attribute__((aligned(32))); // 1536 B
 __thread_local int        Sxi; // sizeof(x)/12
 __thread_local real      *Hxj; 
-__thread_local _x_cache_t Cxj; // 1536 B
+__thread_local _x_cache_t Cxj __attribute__((aligned(32))); // 1536 B
 __thread_local int        Sxj; // sizeof(x)/12
 
 static inline real *xi_C(unsigned int gp_i)
@@ -106,10 +106,10 @@ typedef struct {
 } _q_cache_t;
 
 __thread_local real       *Hqi; 
-__thread_local _q_cache_t  Cqi; // 1024 B
+__thread_local _q_cache_t  Cqi __attribute__((aligned(32))); // 1024 B
 __thread_local int         Sqi;
 __thread_local real       *Hqj; 
-__thread_local _q_cache_t  Cqj; // 1024 B
+__thread_local _q_cache_t  Cqj __attribute__((aligned(32))); // 1024 B
 __thread_local int         Sqj;
 
 static inline real *qi_C(unsigned int gp_i)
@@ -182,10 +182,10 @@ typedef struct {
 } _t_cache_t;
 
 __thread_local int        *Hti; 
-__thread_local _t_cache_t  Cti; // 1024 B
+__thread_local _t_cache_t  Cti __attribute__((aligned(32))); // 1024 B
 __thread_local int         Sti; 
 __thread_local int        *Htj; 
-__thread_local _t_cache_t  Ctj; // 1024 B
+__thread_local _t_cache_t  Ctj __attribute__((aligned(32))); // 1024 B
 __thread_local int         Stj;
 
 static inline int *ti_C(unsigned int gp_i)
@@ -256,7 +256,7 @@ typedef struct {
 // -----   ci  -----
 
 __thread_local nbnxn_ci_t *Hci;
-__thread_local _ci_cache_t Cci; // 1024 B
+__thread_local _ci_cache_t Cci __attribute__((aligned(32))); // 1024 B
 __thread_local int         Sci;
 static inline nbnxn_ci_t *ci_C(unsigned int gp_i)
 {
@@ -298,7 +298,7 @@ typedef struct {
 // -----   cj  -----
 __thread_local nbnxn_cj_t   *Hcj;
 __thread_local int           Scj; // 1024 B
-__thread_local _cj_cache_t   Ccj;
+__thread_local _cj_cache_t   Ccj __attribute__((aligned(32)));
 static inline nbnxn_cj_t *cj_C(unsigned int gp_i)
 {
     int Coffset = M2_MOD(gp_i,CJ_MSK);
@@ -417,10 +417,10 @@ typedef struct {
     int *f_end;
 } func_para_t;
 
-__thread_local func_para_t device_func_para;
-__thread_local real        ldm_f[MAX_F_LDM_SIZE*12];
-__thread_local realv4      zero;
-__thread_local realv4      one;
+__thread_local func_para_t device_func_para __attribute__((aligned(32)));
+__thread_local real        ldm_f[MAX_F_LDM_SIZE*12] __attribute__((aligned(32)));
+__thread_local realv4      zero __attribute__((aligned(32)));
+__thread_local realv4      one __attribute__((aligned(32)));
 
 /* Analytical reaction-field kernels */
 //++++++++++++++++++++++++++++++++++++

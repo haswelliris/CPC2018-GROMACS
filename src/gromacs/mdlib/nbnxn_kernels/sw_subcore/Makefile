@@ -1,8 +1,8 @@
 TARGET = libsubcore.a
 CC = sw5cc
 
-CFLAGS =  -O3 -host -I/usr/sw-mpp/mpi2/include/ -lm -msimd
-SCFLAGS = -O3 -slave -msimd -lm_slave
+CFLAGS =  -O3 -host -I/usr/sw-mpp/mpi2/include/ -lm -msimd -OPT:ieee_arith=3
+SCFLAGS = -O3 -slave -msimd -lm_slave -OPT:ieee_arith=3
 COBJ = SwHost.o
 SOBJ = SwDevice.o nbnxn_kernels_device.o
 
@@ -10,6 +10,7 @@ VPATH = ./sw/
 
 $(TARGET): $(COBJ) $(SOBJ)
 	ar -crv $@ $^
+	-rm -rf $(COBJ) $(SOBJ)
 	
 $(COBJ): %.o: %.c
 	$(CC) $(CFLAGS) -c $<
