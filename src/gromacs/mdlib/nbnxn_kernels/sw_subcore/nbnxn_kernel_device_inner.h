@@ -134,27 +134,40 @@
             aj[3] = cj*UNROLLJ + 3;
 
             realv4 xiX, xiY, xiZ;
+            realv4 xjX, xjY, xjZ;
             xiX.v = xi[i*XI_STRIDE+XX];
             xiY.v = xi[i*XI_STRIDE+YY];
             xiZ.v = xi[i*XI_STRIDE+ZZ];
+            xjX.p[0] = Cxj_p[0*X_STRIDE+XX];
+            xjY.p[0] = Cxj_p[0*X_STRIDE+YY];
+            xjZ.p[0] = Cxj_p[0*X_STRIDE+ZZ];
+            xjX.p[1] = Cxj_p[1*X_STRIDE+XX];
+            xjY.p[1] = Cxj_p[1*X_STRIDE+YY];
+            xjZ.p[1] = Cxj_p[1*X_STRIDE+ZZ];
+            xjX.p[2] = Cxj_p[2*X_STRIDE+XX];
+            xjY.p[2] = Cxj_p[2*X_STRIDE+YY];
+            xjZ.p[2] = Cxj_p[2*X_STRIDE+ZZ];
+            xjX.p[3] = Cxj_p[3*X_STRIDE+XX];
+            xjY.p[3] = Cxj_p[3*X_STRIDE+YY];
+            xjZ.p[3] = Cxj_p[3*X_STRIDE+ZZ];
             // dx  = xi[i*XI_STRIDE+XX] - x[aj*X_STRIDE+XX];
             // dy  = xi[i*XI_STRIDE+YY] - x[aj*X_STRIDE+YY];
             // dz  = xi[i*XI_STRIDE+ZZ] - x[aj*X_STRIDE+ZZ];
             // dx  = xi[i*XI_STRIDE+XX] - Cxj_p[j*X_STRIDE+XX];
             // dy  = xi[i*XI_STRIDE+YY] - Cxj_p[j*X_STRIDE+YY];
             // dz  = xi[i*XI_STRIDE+ZZ] - Cxj_p[j*X_STRIDE+ZZ];
-            dx.p[0]  = xiX.p[0] - Cxj_p[0*X_STRIDE+XX];
-            dy.p[0]  = xiY.p[0] - Cxj_p[0*X_STRIDE+YY];
-            dz.p[0]  = xiZ.p[0] - Cxj_p[0*X_STRIDE+ZZ];
-            dx.p[1]  = xiX.p[1] - Cxj_p[1*X_STRIDE+XX];
-            dy.p[1]  = xiY.p[1] - Cxj_p[1*X_STRIDE+YY];
-            dz.p[1]  = xiZ.p[1] - Cxj_p[1*X_STRIDE+ZZ];
-            dx.p[2]  = xiX.p[2] - Cxj_p[2*X_STRIDE+XX];
-            dy.p[2]  = xiY.p[2] - Cxj_p[2*X_STRIDE+YY];
-            dz.p[2]  = xiZ.p[2] - Cxj_p[2*X_STRIDE+ZZ];
-            dx.p[3]  = xiX.p[3] - Cxj_p[3*X_STRIDE+XX];
-            dy.p[3]  = xiY.p[3] - Cxj_p[3*X_STRIDE+YY];
-            dz.p[3]  = xiZ.p[3] - Cxj_p[3*X_STRIDE+ZZ];
+            dx.p[0]  = xiX.p[0] - xjX.p[0];
+            dy.p[0]  = xiY.p[0] - xjY.p[0];
+            dz.p[0]  = xiZ.p[0] - xjZ.p[0];
+            dx.p[1]  = xiX.p[1] - xjX.p[1];
+            dy.p[1]  = xiY.p[1] - xjY.p[1];
+            dz.p[1]  = xiZ.p[1] - xjZ.p[1];
+            dx.p[2]  = xiX.p[2] - xjX.p[2];
+            dy.p[2]  = xiY.p[2] - xjY.p[2];
+            dz.p[2]  = xiZ.p[2] - xjZ.p[2];
+            dx.p[3]  = xiX.p[3] - xjX.p[3];
+            dy.p[3]  = xiY.p[3] - xjY.p[3];
+            dz.p[3]  = xiZ.p[3] - xjZ.p[3];
 #ifdef DEBUG_CACHE
             if(x[aj*X_STRIDE+XX] != Cxj_p[j*X_STRIDE+XX])
             {
@@ -387,10 +400,31 @@
             // Lets's LOAD all of it to LDM???? 17KB is acceptable
             // TLOG("RI =%d\t tabq_scale =%f\n", ri, ic.tabq_scale);
             //fexcl  = tab_coul_FDV0[ri*4] + frac*tab_coul_FDV0[ri*4+1];
-            fexcl.p[0]  = tab_coul_FDV0[ri[0]*4] + frac.p[0]*tab_coul_FDV0[ri[0]*4+1];
-            fexcl.p[1]  = tab_coul_FDV0[ri[1]*4] + frac.p[1]*tab_coul_FDV0[ri[1]*4+1];
-            fexcl.p[2]  = tab_coul_FDV0[ri[2]*4] + frac.p[2]*tab_coul_FDV0[ri[2]*4+1];
-            fexcl.p[3]  = tab_coul_FDV0[ri[3]*4] + frac.p[3]*tab_coul_FDV0[ri[3]*4+1];
+            realv4 F, D, V;
+            F.p[0] = tab_coul_FDV0[ri[0]*4];
+            D.p[0] = tab_coul_FDV0[ri[0]*4+1];
+#ifdef CALC_ENERGIES
+            V.p[0] = tab_coul_FDV0[ri[0]*4+2];
+#endif
+            F.p[1] = tab_coul_FDV0[ri[1]*4];
+            D.p[1] = tab_coul_FDV0[ri[1]*4+1];
+#ifdef CALC_ENERGIES
+            V.p[1] = tab_coul_FDV0[ri[1]*4+2];
+#endif
+            F.p[2] = tab_coul_FDV0[ri[2]*4];
+            D.p[2] = tab_coul_FDV0[ri[2]*4+1];
+#ifdef CALC_ENERGIES
+            V.p[2] = tab_coul_FDV0[ri[2]*4+2];
+#endif
+            F.p[3] = tab_coul_FDV0[ri[3]*4];
+            D.p[3] = tab_coul_FDV0[ri[3]*4+1];
+#ifdef CALC_ENERGIES
+            V.p[3] = tab_coul_FDV0[ri[3]*4+2];
+#endif
+            fexcl.p[0]  = F.p[0] + frac.p[0]*D.p[0];
+            fexcl.p[1]  = F.p[1] + frac.p[1]*D.p[1];
+            fexcl.p[2]  = F.p[2] + frac.p[2]*D.p[2];
+            fexcl.p[3]  = F.p[3] + frac.p[3]*D.p[3];
             //fexcl  = (1 - frac)*tab_coul_FDV0[ri*2] + frac*tab_coul_FDV0[(ri+1)*2];
 #else
             /* fexcl = (1-frac) * F_i + frac * F_(i+1) */
@@ -417,17 +451,17 @@
             //              -(tab_coul_FDV0[ri*4+2]
             //                -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
             vcoul.p[0]  = qq.p[0]*(interact.p[0]*(rinv.p[0] - ic.sh_ewald)
-                         -(tab_coul_FDV0[ri[0]*4+2]
-                           -halfsp*frac.p[0]*(tab_coul_FDV0[ri[0]*4] + fexcl.p[0])));
+                         -(V.p[0]
+                           -halfsp*frac.p[0]*(F.p[0] + fexcl.p[0])));
             vcoul.p[1]  = qq.p[1]*(interact.p[1]*(rinv.p[1] - ic.sh_ewald)
-                         -(tab_coul_FDV0[ri[1]*4+2]
-                           -halfsp*frac.p[1]*(tab_coul_FDV0[ri[1]*4] + fexcl.p[1])));
+                         -(V.p[1]
+                           -halfsp*frac.p[1]*(F.p[1] + fexcl.p[1])));
             vcoul.p[2]  = qq.p[2]*(interact.p[2]*(rinv.p[2] - ic.sh_ewald)
-                         -(tab_coul_FDV0[ri[2]*4+2]
-                           -halfsp*frac.p[2]*(tab_coul_FDV0[ri[2]*4] + fexcl.p[2])));
+                         -(V.p[2]
+                           -halfsp*frac.p[2]*(F.p[2] + fexcl.p[2])));
             vcoul.p[3]  = qq.p[3]*(interact.p[3]*(rinv.p[3] - ic.sh_ewald)
-                         -(tab_coul_FDV0[ri[3]*4+2]
-                           -halfsp*frac.p[3]*(tab_coul_FDV0[ri[3]*4] + fexcl.p[3])));
+                         -(V.p[3]
+                           -halfsp*frac.p[3]*(F.p[3] + fexcl.p[3])));
             // vcoul  = qq*(interact*(rinv - ic.sh_ewald)
             //              -(tab_coul_FDV0[ri*2+1]
             //                -halfsp*frac*(tab_coul_FDV0[ri*2] + fexcl)));
@@ -508,7 +542,7 @@
             /* Increment i-atom force */
             ////DEVICE_CODE_FENCE();
 #ifdef SW_NEW_ALG
-            // if(write_ci) {
+            if(write_ci) {
 #endif
                 // fi[i*FI_STRIDE+XX] += fx;
                 // fi[i*FI_STRIDE+YY] += fy;
@@ -517,7 +551,7 @@
                 fi[i*FI_STRIDE+YY] += fy.p[0] + fy.p[1] + fy.p[2] + fy.p[3];
                 fi[i*FI_STRIDE+ZZ] += fz.p[0] + fz.p[1] + fz.p[2] + fz.p[3];
 #ifdef SW_NEW_ALG
-            // }
+            }
 #endif
             /* Decrement j-atom force */
             ////DEVICE_CODE_FENCE();
