@@ -9,6 +9,8 @@ volatile long host_in_param[PARAM_SIZE];
 volatile long host_notice_counter;
 struct InitParam host_param;
 
+int load_balance_step = 1;
+
 extern void SLAVE_FUN(device_main)();
 
 void notice_device()
@@ -41,6 +43,12 @@ void init_device()
 
     athread_init();
     athread_spawn(device_main, (void*)&host_param);
+
+    char *load_balance_step_str = getenv("LOAD_BALANCE_STEP");
+    if (load_balance_step_str != NULL)
+        load_balance_step = atoi(load_balance_step_str);
+    if (load_balance_step == 0)
+        load_balance_step = 1;
 }
 
 void release_device()
