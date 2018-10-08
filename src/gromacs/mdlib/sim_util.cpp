@@ -962,10 +962,16 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
     {
         wallcycle_start(wcycle, ewcLAUNCH_GPU_NB);
         /* launch local nonbonded F on GPU */
+        //TLOG("Wow 2\n");
         do_nb_verlet(fr, ic, enerd, flags, eintLocal, enbvClearFNo,
                      nrnb, wcycle);
         wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
     }
+#ifdef OVERLAP_TEST
+    // do Wow 4
+    do_nb_verlet(fr, ic, enerd, flags, eintLocal, enbvClearFYes,
+                 nrnb, wcycle);
+#endif
 
     /* Communicate coordinates and sum dipole if necessary +
        do non-local pair search */
@@ -1037,11 +1043,20 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         {
             wallcycle_start(wcycle, ewcLAUNCH_GPU_NB);
             /* launch non-local nonbonded F on GPU */
+            //TLOG("Wow 3\n");
             do_nb_verlet(fr, ic, enerd, flags, eintNonlocal, enbvClearFNo,
                          nrnb, wcycle);
             cycles_force += wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
         }
     }
+#ifdef OVERLAP_TEST
+    //wait Wow 4
+    //wait_device();
+    //do Wow5
+    do_nb_verlet(fr, ic, enerd, flags, eintNonlocal,
+                         bDiffKernels ? enbvClearFYes : enbvClearFNo,
+                         nrnb, wcycle);
+#endif
 
     if (bUseGPU)
     {
@@ -1165,9 +1180,14 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
 
     if (!bUseOrEmulGPU)
     {
+        //TLOG("Wow 4\n");
         /* Maybe we should move this into do_force_lowlevel */
+#ifndef OVERLAP_TEST
         do_nb_verlet(fr, ic, enerd, flags, eintLocal, enbvClearFYes,
                      nrnb, wcycle);
+#else
+        
+#endif
     }
 
     if (fr->efep != efepNO)
@@ -1199,9 +1219,15 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
 
         if (DOMAINDECOMP(cr))
         {
+            //TLOG("Wow 5\n");
+#ifndef OVERLAP_TEST
             do_nb_verlet(fr, ic, enerd, flags, eintNonlocal,
                          bDiffKernels ? enbvClearFYes : enbvClearFNo,
                          nrnb, wcycle);
+#else
+            //wait Wow5
+            //wait_device();
+#endif
         }
 
         if (!bUseOrEmulGPU)
@@ -1291,6 +1317,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
             else
             {
                 wallcycle_start_nocount(wcycle, ewcFORCE);
+                //TLOG("Wow 6\n");
                 do_nb_verlet(fr, ic, enerd, flags, eintNonlocal, enbvClearFYes,
                              nrnb, wcycle);
                 cycles_force += wallcycle_stop(wcycle, ewcFORCE);
@@ -1397,6 +1424,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         else
         {
             wallcycle_start_nocount(wcycle, ewcFORCE);
+            //TLOG("Wow 7\n");
             do_nb_verlet(fr, ic, enerd, flags, eintLocal,
                          DOMAINDECOMP(cr) ? enbvClearFNo : enbvClearFYes,
                          nrnb, wcycle);

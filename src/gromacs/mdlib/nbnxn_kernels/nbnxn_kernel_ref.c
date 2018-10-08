@@ -401,6 +401,35 @@ void subcore_loadbalance(nbnxn_atomdata_t *nbat, nbnxn_pairlist_t *nbl, int *f_s
     free(workload);
 }
 
+struct {
+    const nbnxn_pairlist_set_t *nbl_list;
+    const nbnxn_atomdata_t     *nbat;
+    const interaction_const_t  *ic;
+    rvec                       *shift_vec;
+    int                         force_flags;
+    int                         clearF;
+    real                       *fshift;
+    real                       *Vc;
+    real                       *Vvdw;
+    gmx_wallcycle_t             wcycle;
+
+    int func_type;
+    int *f_start;
+    int *f_end;
+    nbnxn_atomdata_output_t *out;
+    real                    *fshift_p;
+    real *expand_fshift;
+    real *other_f;
+    nbnxn_pairlist_t other_nbl;
+    nbnxn_atomdata_t other_nbat;
+    rvec *other_shift_vec;
+    real *other_tabq_coul_F;
+    real *other_tabq_coul_V;
+    real *other_tabq_coul_FDV0;
+    real *expand_Vvdw;
+    real *expand_Vc;
+} nbnxn_kernel_ref_para;
+
 void
 nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                  const nbnxn_atomdata_t     *nbat,
@@ -516,11 +545,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         real *other_f       = (real*)malloc(nbat->natoms*nbat->fstride*sizeof(real));
         memcpy(other_f, out->f, nbat->natoms*nbat->fstride*sizeof(real));
 
-        nbnxn_pairlist_t other_nbl;
-        deep_copy_nbl(&other_nbl, nbl[nb], 1, 0);
-
-        nbnxn_atomdata_t other_nbat;
-        deep_copy_nbat(&other_nbat, nbat, 1, 0);
+        deep_copy_nbl(&nbnxn_kernel_ref_para.other_nbl, nbl[nb], 1, 0);
+        deep_copy_nbat(&nbnxn_kernel_ref_para.other_nbat, nbat, 1, 0);
 
         rvec *other_shift_vec = (rvec*)malloc(SHIFTS*DIM*sizeof(real));
         memcpy(other_shift_vec, shift_vec, SHIFTS*DIM*sizeof(real));
@@ -562,8 +588,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_out_param[FUNC_I] = coult;
             host_out_param[FUNC_J] = vdwt;
             host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
-            host_func_para.nbl = &other_nbl; // read only
-            host_func_para.nbat = &other_nbat; // read only
+            host_func_para.nbl = &nbnxn_kernel_ref_para.other_nbl; // read only
+            host_func_para.nbat = &nbnxn_kernel_ref_para.other_nbat; // read only
             host_func_para.ic = ic;      // read only
             host_func_para.shift_vec = other_shift_vec; // read only
             host_func_para.f = other_f; // write only, reduce FIN
@@ -582,7 +608,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
 #endif
             notice_device();
+#ifndef OVERLAP_TEST
             wait_device();
+#endif
 
             /* Don't calculate energies */
             //fake_device_run();
@@ -603,8 +631,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_out_param[FUNC_I] = coult;
             host_out_param[FUNC_J] = vdwt;
             host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
-            host_func_para.nbl = &other_nbl;
-            host_func_para.nbat = &other_nbat;
+            host_func_para.nbl = &nbnxn_kernel_ref_para.other_nbl;
+            host_func_para.nbat = &nbnxn_kernel_ref_para.other_nbat;
             host_func_para.ic = ic;
             host_func_para.shift_vec = other_shift_vec;
             host_func_para.f = other_f;
@@ -623,7 +651,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
 #endif
             notice_device();
+#ifndef OVERLAP_TEST
             wait_device();
+#endif
 
             //fake_device_run();
             //p_nbk_c_ener[coult][vdwt]();
@@ -632,6 +662,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             TLOG("MOee 0.\n");
             //wait_device();
 #endif
+#ifndef OVERLAP_TEST
             // reduce Vvdw
             int i;
             for(i = 0; i < 64 - 1; ++i)
@@ -640,6 +671,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
             out->Vvdw[0] = expand_Vvdw[63];
             free(expand_Vvdw);
+
 #ifdef DEBUG_FPEX
             {
                 TLOG("MOee 0.2\n");
@@ -666,6 +698,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
             out->Vc[0] = expand_Vc[63];
             free(expand_Vc);
+#endif //OVERLAP_TEST
 #ifdef DEBUG_FPEX
             TLOG("MOee 1.\n");
             wait_device();
@@ -693,8 +726,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             host_out_param[FUNC_I] = coult;
             host_out_param[FUNC_J] = vdwt;
             host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
-            host_func_para.nbl = &other_nbl;
-            host_func_para.nbat = &other_nbat;
+            host_func_para.nbl = &nbnxn_kernel_ref_para.other_nbl;
+            host_func_para.nbat = &nbnxn_kernel_ref_para.other_nbat;
             host_func_para.ic = ic;
             host_func_para.shift_vec = other_shift_vec;
             host_func_para.f = other_f;
@@ -713,7 +746,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
 #endif
             notice_device();
+#ifndef OVERLAP_TEST
             wait_device();
+#endif
 
             //fake_device_run();
 #ifdef SW_ENERGRP /* in SwConfig */
@@ -727,6 +762,7 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             }
 
 #endif
+#ifndef OVERLAP_TEST
             // reduce Vvdw
             int j;
             for(i = 0; i < 64 - 1; ++i)
@@ -755,7 +791,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                 out->Vc[j] = expand_Vc[(63)*out->nV+j];
             }
             free(expand_Vc);
+#endif // OVERLAP_TEST
         }
+#ifndef OVERLAP_TEST
 #ifdef DEBUG_FPEX
         TLOG("MOee 2.\n");
         wait_device();
@@ -786,9 +824,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         memcpy(out->f, other_f, nbat->natoms*nbat->fstride*sizeof(real));
         free(other_f);
 
-        deep_copy_nbl(nbl[nb], &other_nbl, 0, 1);
+        deep_copy_nbl(nbl[nb], &nbnxn_kernel_ref_para.other_nbl, 0, 1);
 
-        deep_copy_nbat(nbat, &other_nbat, 0, 1);
+        deep_copy_nbat(nbat, &nbnxn_kernel_ref_para.other_nbat, 0, 1);
 #ifdef DEBUG_FPEX
         TLOG("MOee 5.\n");
         wait_device();
@@ -804,14 +842,119 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
         free(f_start);
         free(f_end);
+
+        // free(other_nbl);
+        // free(other_nbat);
 #ifdef DEBUG_FPEX
         TLOG("MOee 6.\n");
         wait_device();
 #endif
+
+#endif // OVERLAP_TEST
     }
+#ifndef OVERLAP_TEST
+    if (force_flags & GMX_FORCE_ENERGY)
+    {
+        reduce_energies_over_lists(nbat, nnbl, Vvdw, Vc);
+    }
+#endif
+}
+
+#ifdef OVERLAP_TEST
+void nbnxn_kernels_ref_reduce()
+{
+        wait_device();
+        if (!(force_flags & GMX_FORCE_ENERGY))
+        {
+            
+
+        }
+        else if (out->nV == 1)
+        {
+            // reduce Vvdw
+            int i;
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                expand_Vvdw[i+1] += expand_Vvdw[i];
+            }
+            out->Vvdw[0] = expand_Vvdw[63];
+            free(expand_Vvdw);
+            // reduce Vc
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                expand_Vc[i+1] += expand_Vc[i];
+            }
+            out->Vc[0] = expand_Vc[63];
+            free(expand_Vc);
+        }
+        else
+        {
+            // reduce Vvdw
+            int j;
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                for (j = 0; j < out->nV; j++)
+                {
+                    expand_Vvdw[(i+1)*out->nV+j] += expand_Vvdw[(i)*out->nV+j];
+                }
+            }
+            for (j = 0; j < out->nV; j++)
+            {
+                out->Vvdw[j] = expand_Vvdw[(63)*out->nV+j];
+            }
+            free(expand_Vvdw);
+
+            // reduce Vc
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                for (j = 0; j < out->nV; j++)
+                {
+                    expand_Vc[(i+1)*out->nV+j] += expand_Vc[(i)*out->nV+j];
+                }
+            }
+            for (j = 0; j < out->nV; j++)
+            {
+                out->Vc[j] = expand_Vc[(63)*out->nV+j];
+            }
+            free(expand_Vc);
+        }
+        // reduce fshift
+        int i, j;
+        for(i = 0; i < 64 - 1; ++i)
+        {
+            for(j = 0; j < SHIFTS*DIM; ++j)
+            {
+                expand_fshift[(i+1)*SHIFTS*DIM+j] += expand_fshift[(i)*SHIFTS*DIM+j];
+            }
+        }
+        for(j = 0; j < SHIFTS*DIM; ++j)
+        {
+            fshift_p[j] += expand_fshift[63*SHIFTS*DIM+j];
+        }
+        free(expand_fshift);
+        //wallcycle_sub_start(wcycle, ewcsMEMCPY);
+        memcpy(out->f, other_f, nbat->natoms*nbat->fstride*sizeof(real));
+        free(other_f);
+
+        deep_copy_nbl(nbl[nb], &nbnxn_kernel_ref_para.other_nbl, 0, 1);
+
+        deep_copy_nbat(nbat, &nbnxn_kernel_ref_para.other_nbat, 0, 1);
+
+        free(other_shift_vec);
+
+#ifndef GMX_DOUBLE
+        free(other_tabq_coul_FDV0);
+#else
+        free(other_tabq_coul_F);
+        free(other_tabq_coul_V);
+#endif
+        //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
+        free(f_start);
+        free(f_end);
 
     if (force_flags & GMX_FORCE_ENERGY)
     {
         reduce_energies_over_lists(nbat, nnbl, Vvdw, Vc);
     }
 }
+#endif
