@@ -4,6 +4,25 @@
 #define GMX_DOUBLE
 #undef GMX_DOUBLE
 
+#ifndef GMX_DOUBLE
+union realv4  
+{ 
+    floatv4 v; 
+    float p[4]; 
+};
+#define simd_set_realv4 simd_set_floatv4
+#define simd_vsqrt      simd_vsqrts
+#else
+union realv4 
+{ 
+    doublev4 v; 
+    double p[4]; 
+};
+#define simd_set_realv4 simd_set_doublev4
+#define simd_vsqrt      simd_vsqrtd
+#endif
+typedef union realv4 realv4;
+
 /* With CPU kernels the i-cluster size is always 4 atoms.
  * With x86 SIMD the j-cluster size can be 2, 4 or 8, otherwise 4.
  */
