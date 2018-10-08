@@ -351,16 +351,17 @@ void subcore_loadbalance(nbnxn_atomdata_t *nbat, nbnxn_pairlist_t *nbl, int *f_s
 	for (n = 0; n < nbl->nci; n++) {
 	    f_count[nbl->ci[n].ci] += nbl->ci[n].cj_ind_end - nbl->ci[n].cj_ind_start;
 	    tot_work_count += nbl->ci[n].cj_ind_end - nbl->ci[n].cj_ind_start;
-	    for (i = nbl->ci[n].cj_ind_start; i < nbl->ci[n].cj_ind_end; i++) {
-	    	f_count[nbl->cj[i].cj]++;
-	    	tot_work_count++;
+	    for (i = nbl->ci[n].cj_ind_start; i < nbl->ci[n].cj_ind_end; i+=load_balance_step) {
+	    	f_count[nbl->cj[i].cj]+=load_balance_step;
+	    	tot_work_count+=load_balance_step;
 	    }
 	}
 	avg_work_load = tot_work_count/64+1;
 	int p = 0;
 	while (f_count[f_count_len-1] == 0)
 	    f_count_len--;
-    for (device_core_id = 0; device_core_id < 64; device_core_id++) {
+    for (device_core_id = 0; device_core_id < 64; device_core_id++)
+    {
 	    while (f_count[p] == 0) p++;
     	f_start[device_core_id] = p;
 		while (p < f_count_len && 
@@ -371,7 +372,27 @@ void subcore_loadbalance(nbnxn_atomdata_t *nbat, nbnxn_pairlist_t *nbl, int *f_s
     		p++;
     	}
     	f_end[device_core_id] = p;
+        if (device_core_id != 0) {
+            tot_work_count -= workload[device_core_id];
+            avg_work_load = tot_work_count/(63-device_core_id)+1;
+        }
 	}
+    for (device_core_id = 63; workload[device_core_id] == 0 && device_core_id >= 0; device_core_id--)
+    {
+        int max_workload = workload[0], max_workload_index = 0;
+        for (i = 1; i < device_core_id; i++)
+            if (max_workload < workload[i]) {
+                max_workload = workload[i];
+                max_workload_index = i;
+            }
+        f_end[device_core_id] = f_end[max_workload_index];
+        int mid = (f_start[max_workload_index]+f_end[max_workload_index])/2;
+        f_end[max_workload_index] = mid;
+        f_start[device_core_id] = mid;
+    }
+    // for (device_core_id = 0; device_core_id < 64; device_core_id++)
+    //     if (f_end[device_core_id]-f_start[device_core_id] == 0)
+    // printf("!");
     // for (device_core_id = 0; device_core_id < 64; device_core_id++) {
     //     f_start[device_core_id] = BLOCK_HEAD(device_core_id, 64, f_count_len);
     //     f_end  [device_core_id] = f_start[device_core_id] + BLOCK_SIZE(device_core_id, 64, f_count_len);

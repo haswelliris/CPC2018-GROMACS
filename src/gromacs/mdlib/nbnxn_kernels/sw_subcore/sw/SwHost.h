@@ -12,6 +12,8 @@ extern volatile long host_in_param[PARAM_SIZE];
 extern volatile long host_notice_counter;
 extern struct InitParam host_param;
 
+extern int load_balance_step;
+
 void init_device();
 
 void notice_device();
