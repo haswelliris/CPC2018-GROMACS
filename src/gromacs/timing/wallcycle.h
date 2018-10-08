@@ -78,6 +78,10 @@ enum {
     ewcsNB_X_BUF_OPS,
     ewcsNB_F_BUF_OPS,
     ewcsMEMCPY,
+    ewcsFFT_1,
+    ewcsFFT_2,
+    ewcsFFT_3,
+    ewcsFFT_4,
     ewcsNR
 };
 

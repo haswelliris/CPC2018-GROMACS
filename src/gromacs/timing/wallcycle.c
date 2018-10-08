@@ -125,7 +125,11 @@ static const char *wcsn[ewcsNR] =
     "Ewald F correction",
     "NB X buffer ops.",
     "NB F buffer ops.",
-    "MEMCPY TIME"
+    "MEMCPY TIME",
+    "FFT 1",
+    "FFT 2",
+    "FFT 3",
+    "FFT 4"
 };
 
 gmx_bool wallcycle_have_counter(void)

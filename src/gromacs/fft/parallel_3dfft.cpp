@@ -174,11 +174,15 @@ gmx_parallel_3dfft_execute(gmx_parallel_3dfft_t    pfft_setup,
     }
     if (dir == GMX_FFT_FORWARD || dir == GMX_FFT_REAL_TO_COMPLEX)
     {
+        wallcycle_sub_start(wcycle, ewcsFFT_1);
         fft5d_execute(pfft_setup->p1, thread, wcycle);
+        wallcycle_sub_stop(wcycle, ewcsFFT_1);
     }
     else
     {
+        wallcycle_sub_start(wcycle, ewcsFFT_2);
         fft5d_execute(pfft_setup->p2, thread, wcycle);
+        wallcycle_sub_stop(wcycle, ewcsFFT_2);
     }
     return 0;
 }

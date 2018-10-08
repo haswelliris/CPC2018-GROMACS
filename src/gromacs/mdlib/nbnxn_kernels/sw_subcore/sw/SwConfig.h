@@ -74,7 +74,7 @@ struct InitParam
 #undef SW_NOCACLU
 
 #define HAHAHAHAHAHAHAHA
-//#undef HAHAHAHAHAHAHAHA
+#undef HAHAHAHAHAHAHAHA
 
 #define DEBUG_LB
 #undef DEBUG_LB
