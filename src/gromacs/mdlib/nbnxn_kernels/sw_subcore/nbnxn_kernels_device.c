@@ -419,8 +419,8 @@ typedef struct {
 
 __thread_local func_para_t device_func_para;
 __thread_local real        ldm_f[MAX_F_LDM_SIZE*12];
-__thread_local realv4      zeroV;
-__thread_local realv4      oneV;
+__thread_local realv4      zero;
+__thread_local realv4      one;
 
 /* Analytical reaction-field kernels */
 //++++++++++++++++++++++++++++++++++++
@@ -583,8 +583,8 @@ void kaCHI_func(int n)
 
 void device_run()
 {
-    zeroV.v = 0.0;
-    oneV.v = 1.0;
+    zero.v = 0.0;
+    one.v = 1.0;
 #ifdef DEBUG_SDLB
     TLOG("kaCHI 0.\n");
 #endif

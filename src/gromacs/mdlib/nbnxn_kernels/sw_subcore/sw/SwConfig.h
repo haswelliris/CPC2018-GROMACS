@@ -81,6 +81,8 @@ struct InitParam
 
 #define SIMD_INNER
 
+#define DEBUG_SIMD
+
 #define MAX_F_LDM_SIZE 360 // div 12
 // ----
 
