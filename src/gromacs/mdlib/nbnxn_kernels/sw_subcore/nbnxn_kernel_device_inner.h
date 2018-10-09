@@ -110,6 +110,12 @@
             interact.p[1] = (real)((Ccj_p->excl>>(i*UNROLLI + 1)) & 1);
             interact.p[2] = (real)((Ccj_p->excl>>(i*UNROLLI + 2)) & 1);
             interact.p[3] = (real)((Ccj_p->excl>>(i*UNROLLI + 3)) & 1);
+            // WHAT!!????
+            // real it0 = (real)((Ccj_p->excl>>(i*UNROLLI + 0)) & 1);
+            // real it1 = (real)((Ccj_p->excl>>(i*UNROLLI + 1)) & 1);
+            // real it2 = (real)((Ccj_p->excl>>(i*UNROLLI + 2)) & 1);
+            // real it3 = (real)((Ccj_p->excl>>(i*UNROLLI + 3)) & 1);
+            // interact.v = simd_set_realv4(it0, it1, it2, it3);
 #ifndef EXCL_FORCES
             skipmask.v = interact.v;
 #else   
@@ -118,6 +124,13 @@
             skipmask.p[1] = !(cj == ci_sh && 1 <= i);
             skipmask.p[2] = !(cj == ci_sh && 2 <= i);
             skipmask.p[3] = !(cj == ci_sh && 3 <= i);
+            // FaQ！
+            // skipmask.v = simd_set_realv4(
+            //     ((real)!(cj == ci_sh && 0 <= i)),
+            //     ((real)!(cj == ci_sh && 1 <= i)),
+            //     ((real)!(cj == ci_sh && 2 <= i)),
+            //     ((real)!(cj == ci_sh && 3 <= i))
+            // );
             
 #endif  // EXCL_FORCES
 #else
@@ -128,7 +141,7 @@
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.1.\n");
 #endif
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
             //aj = cj*UNROLLJ + j;
             aj[0] = cj*UNROLLJ + 0;
             aj[1] = cj*UNROLLJ + 1;
@@ -206,12 +219,24 @@
             /* Prepare to enforce the cut-off. */
             //skipmask = (rsq >= rcut2) ? 0 : skipmask;
             /* 9 flops for r^2 + cut-off check */
-            skipmask.p[0] = (rsq.p[0] >= rcut2) ? 0.0 : skipmask.p[0];
-            skipmask.p[1] = (rsq.p[1] >= rcut2) ? 0.0 : skipmask.p[1];
-            skipmask.p[2] = (rsq.p[2] >= rcut2) ? 0.0 : skipmask.p[2];
-            skipmask.p[3] = (rsq.p[3] >= rcut2) ? 0.0 : skipmask.p[3];
-            // skipmask.v = simd_vsellt(rsq.v - rcut2, skipmask.v, zero.v);
-            DEVICE_CODE_FENCE();
+            // skipmask.p[0] = (rsq.p[0] >= rcut2) ? 0.0 : skipmask.p[0];
+            // skipmask.p[1] = (rsq.p[1] >= rcut2) ? 0.0 : skipmask.p[1];
+            // skipmask.p[2] = (rsq.p[2] >= rcut2) ? 0.0 : skipmask.p[2];
+            // skipmask.p[3] = (rsq.p[3] >= rcut2) ? 0.0 : skipmask.p[3];
+            skipmask.p[0] = (rsq.p[0] - rcut2 >= 0) ? 0.0 : skipmask.p[0];
+            skipmask.p[1] = (rsq.p[1] - rcut2 >= 0) ? 0.0 : skipmask.p[1];
+            skipmask.p[2] = (rsq.p[2] - rcut2 >= 0) ? 0.0 : skipmask.p[2];
+            skipmask.p[3] = (rsq.p[3] - rcut2 >= 0) ? 0.0 : skipmask.p[3];
+            // skipmask.p[0] = (rsq.p[0] - rcut2 < 0) ? skipmask.p[0] :0.0;
+            // skipmask.p[1] = (rsq.p[1] - rcut2 < 0) ? skipmask.p[1] :0.0;
+            // skipmask.p[2] = (rsq.p[2] - rcut2 < 0) ? skipmask.p[2] :0.0;
+            // skipmask.p[3] = (rsq.p[3] - rcut2 < 0) ? skipmask.p[3] :0.0;
+            // SIMD_SELLGE NOT SUPPORTED?! KIDDING ME!
+            // DEVICE_CODE_FENCE();
+            // realv4 rdiff;
+            // rdiff.v = rsq.v - rcut2;
+            // skipmask.v = __builtin_sw64_sllt(rdiff.v, skipmask.v, zero.v);
+            //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.2.\n");
             //wait_host(device_core_id);
@@ -410,7 +435,7 @@
             // rs.p[2]     = rsq.p[2]*rinv.p[2]*ic.tabq_scale;
             // rs.p[3]     = rsq.p[3]*rinv.p[3]*ic.tabq_scale;
             rs.v     = rsq.v*rinv.v*ic.tabq_scale;
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
             //ri     = (int)rs;
             ri[0]     = (int)rs.p[0];
             ri[1]     = (int)rs.p[1];
@@ -457,7 +482,7 @@
 #ifdef CALC_ENERGIES
             V.p[3] = tab_coul_FDV0[ri[3]*4+2];
 #endif
-            DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
             // fexcl.p[0]  = F.p[0] + frac.p[0]*D.p[0];
             // fexcl.p[1]  = F.p[1] + frac.p[1]*D.p[1];
             // fexcl.p[2]  = F.p[2] + frac.p[2]*D.p[2];
