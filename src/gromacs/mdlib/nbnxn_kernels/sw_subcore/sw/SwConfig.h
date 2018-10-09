@@ -82,6 +82,9 @@ struct InitParam
 #define SIMD_INNER
 
 #define DEBUG_SIMD
+#undef DEBUG_SIMD
+
+#define FORCE_OVERLAP
 
 #define MAX_F_LDM_SIZE 360 // div 12
 // ----

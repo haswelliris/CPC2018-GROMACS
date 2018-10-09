@@ -57,6 +57,8 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                  real                       *Vvdw,
                  gmx_wallcycle_t             wcycle);
 
+void nbnxn_kernel_ref_reduce();
+
 #ifdef __cplusplus
 }
 #endif

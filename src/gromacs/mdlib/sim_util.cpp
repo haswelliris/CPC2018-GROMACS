@@ -98,6 +98,14 @@
 #include "adress.h"
 #include "nbnxn_gpu.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "gromacs/mdlib/nbnxn_kernels/sw_subcore/sw/SwHost.h"
+#ifdef __cplusplus
+}
+#endif
+
 void print_time(FILE                     *out,
                 gmx_walltime_accounting_t walltime_accounting,
                 gmx_int64_t               step,
@@ -499,6 +507,9 @@ static void do_nb_verlet(t_forcerec *fr,
                              enerd->grpp.ener[egBHAMSR] :
                              enerd->grpp.ener[egLJSR],
                              wcycle);
+#ifndef FORCE_OVERLAP
+            nbnxn_kernel_ref_reduce();
+#endif
             break;
 
         case nbnxnk4xN_SIMD_4xN:
@@ -966,6 +977,13 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                      nrnb, wcycle);
         wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
     }
+#ifdef FORCE_OVERLAP
+    /* launch local nonbonded F on SW */
+    wallcycle_start(wcycle, ewcFORCE);
+    do_nb_verlet(fr, ic, enerd, flags, eintLocal, enbvClearFYes,
+                 nrnb, wcycle);
+    cycles_force += wallcycle_stop(wcycle, ewcFORCE);
+#endif
 
     /* Communicate coordinates and sum dipole if necessary +
        do non-local pair search */
@@ -1111,7 +1129,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
      * No parallel communication should occur while this counter is running,
      * since that will interfere with the dynamic load balancing.
      */
-    wallcycle_start(wcycle, ewcFORCE);
+    wallcycle_start_nocount(wcycle, ewcFORCE);
     if (bDoForces)
     {
         /* Reset forces for which the virial is calculated separately:
@@ -1162,13 +1180,30 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
      * force calculation imbalance can be balanced out by the domain
      * decomposition load balancing.
      */
-
+#ifndef FORCE_OVERLAP
     if (!bUseOrEmulGPU)
     {
         /* Maybe we should move this into do_force_lowlevel */
         do_nb_verlet(fr, ic, enerd, flags, eintLocal, enbvClearFYes,
                      nrnb, wcycle);
     }
+#endif
+#ifdef FORCE_OVERLAP
+    /* reduce local nonbonded F on SW */
+    wallcycle_sub_start_nocount(wcycle, ewcsNONBONDED);
+    nbnxn_kernel_ref_reduce();
+    wallcycle_sub_stop(wcycle, ewcsNONBONDED);
+    if (!bUseOrEmulGPU || bDiffKernels)
+    {
+    if (DOMAINDECOMP(cr))
+    {
+        /* launch non-local nonbonded F on SW */
+        do_nb_verlet(fr, ic, enerd, flags, eintNonlocal,
+                            bDiffKernels ? enbvClearFYes : enbvClearFNo,
+                            nrnb, wcycle);
+    }
+    }
+#endif
 
     if (fr->efep != efepNO)
     {
@@ -1190,49 +1225,6 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                              fr, x, f, mdatoms,
                              inputrec->fepvals, lambda,
                              enerd, flags, nrnb, wcycle);
-        }
-    }
-
-    if (!bUseOrEmulGPU || bDiffKernels)
-    {
-        int aloc;
-
-        if (DOMAINDECOMP(cr))
-        {
-            do_nb_verlet(fr, ic, enerd, flags, eintNonlocal,
-                         bDiffKernels ? enbvClearFYes : enbvClearFNo,
-                         nrnb, wcycle);
-        }
-
-        if (!bUseOrEmulGPU)
-        {
-            aloc = eintLocal;
-        }
-        else
-        {
-            aloc = eintNonlocal;
-        }
-
-        /* Add all the non-bonded force to the normal force array.
-         * This can be split into a local and a non-local part when overlapping
-         * communication with calculation with domain decomposition.
-         */
-        cycles_force += wallcycle_stop(wcycle, ewcFORCE);
-        wallcycle_start(wcycle, ewcNB_XF_BUF_OPS);
-        wallcycle_sub_start(wcycle, ewcsNB_F_BUF_OPS);
-        nbnxn_atomdata_add_nbat_f_to_f(nbv->nbs, eatAll, nbv->grp[aloc].nbat, f);
-        wallcycle_sub_stop(wcycle, ewcsNB_F_BUF_OPS);
-        cycles_force += wallcycle_stop(wcycle, ewcNB_XF_BUF_OPS);
-        wallcycle_start_nocount(wcycle, ewcFORCE);
-
-        /* if there are multiple fshift output buffers reduce them */
-        if ((flags & GMX_FORCE_VIRIAL) &&
-            nbv->grp[aloc].nbl_lists.nnbl > 1)
-        {
-            /* This is not in a subcounter because it takes a
-               negligible and constant-sized amount of time */
-            nbnxn_atomdata_add_nbat_fshift_to_fshift(nbv->grp[aloc].nbat,
-                                                     fr->fshift);
         }
     }
 
@@ -1268,6 +1260,60 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
     {
         do_flood(cr, inputrec, x, f, ed, box, step, bNS);
     }
+
+    wallcycle_start_nocount(wcycle, ewcFORCE);
+    // here compute nonlocal nonbonded F
+    if (!bUseOrEmulGPU || bDiffKernels)
+    {
+        int aloc;
+
+        if (DOMAINDECOMP(cr))
+        {
+#ifndef FORCE_OVERLAP
+            do_nb_verlet(fr, ic, enerd, flags, eintNonlocal,
+                         bDiffKernels ? enbvClearFYes : enbvClearFNo,
+                         nrnb, wcycle);
+#else
+            wallcycle_sub_start_nocount(wcycle, ewcsNONBONDED);
+            /* reduce non-local nonbonded F on SW */
+            nbnxn_kernel_ref_reduce();
+            wallcycle_sub_stop(wcycle, ewcsNONBONDED);
+#endif
+        }
+
+        if (!bUseOrEmulGPU)
+        {
+            aloc = eintLocal;
+        }
+        else
+        {
+            aloc = eintNonlocal;
+        }
+
+        /* Add all the non-bonded force to the normal force array.
+         * This can be split into a local and a non-local part when overlapping
+         * communication with calculation with domain decomposition.
+         */
+        cycles_force += wallcycle_stop(wcycle, ewcFORCE);
+        wallcycle_start(wcycle, ewcNB_XF_BUF_OPS);
+        wallcycle_sub_start(wcycle, ewcsNB_F_BUF_OPS);
+        nbnxn_atomdata_add_nbat_f_to_f(nbv->nbs, eatAll, nbv->grp[aloc].nbat, f);
+        wallcycle_sub_stop(wcycle, ewcsNB_F_BUF_OPS);
+        cycles_force += wallcycle_stop(wcycle, ewcNB_XF_BUF_OPS);
+        wallcycle_start_nocount(wcycle, ewcFORCE);
+
+        /* if there are multiple fshift output buffers reduce them */
+        if ((flags & GMX_FORCE_VIRIAL) &&
+            nbv->grp[aloc].nbl_lists.nnbl > 1)
+        {
+            /* This is not in a subcounter because it takes a
+               negligible and constant-sized amount of time */
+            nbnxn_atomdata_add_nbat_fshift_to_fshift(nbv->grp[aloc].nbat,
+                                                     fr->fshift);
+        }
+    }
+
+    cycles_force += wallcycle_stop(wcycle, ewcFORCE);
 
     if (bUseOrEmulGPU && !bDiffKernels)
     {
