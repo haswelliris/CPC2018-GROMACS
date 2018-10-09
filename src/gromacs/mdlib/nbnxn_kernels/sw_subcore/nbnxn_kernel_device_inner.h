@@ -73,7 +73,6 @@
             realv4 dx, dy, dz;
             realv4 rsq, rinv;
             realv4 rinvsq, rinvsix;
-            realv4 c6, c12;
             realv4 FrLJ6, FrLJ12, frLJ, VLJ;
             FrLJ6.v = 0.0, FrLJ12.v = 0.0, frLJ.v = 0.0, VLJ.v = 0.0;
 
@@ -143,10 +142,6 @@
 #endif
             //DEVICE_CODE_FENCE();
             //aj = cj*UNROLLJ + j;
-            aj[0] = cj*UNROLLJ + 0;
-            aj[1] = cj*UNROLLJ + 1;
-            aj[2] = cj*UNROLLJ + 2;
-            aj[3] = cj*UNROLLJ + 3;
 
             realv4 xiX, xiY, xiZ;
             realv4 xjX, xjY, xjZ;
@@ -294,6 +289,7 @@
                 /* OUR CACHE SIZE =  39*2*12*sizeof(int) = 3744 Byte */
                 //c6      = nbfp[type_i_off+Ctj_p[j]*2  ];
                 //c12     = nbfp[type_i_off+Ctj_p[j]*2+1];
+                realv4 c6, c12;
                 c6.p [0]      = nbfp[type_i_off+Ctj_p[0]*2  ];
                 c12.p[0]      = nbfp[type_i_off+Ctj_p[0]*2+1];
                 c6.p [1]      = nbfp[type_i_off+Ctj_p[1]*2  ];
@@ -302,7 +298,7 @@
                 c12.p[2]      = nbfp[type_i_off+Ctj_p[2]*2+1];
                 c6.p [3]      = nbfp[type_i_off+Ctj_p[3]*2  ];
                 c12.p[3]      = nbfp[type_i_off+Ctj_p[3]*2+1];
-                DEVICE_CODE_FENCE();
+                //DEVICE_CODE_FENCE();
 #if defined LJ_CUT
                 //rinvsix = interact*rinvsq*rinvsq*rinvsq;
                 // rinvsix.p[0] = interact.p[0]*rinvsq.p[0]*rinvsq.p[0]*rinvsq.p[0];
@@ -641,6 +637,10 @@
 #ifdef SW_NEW_ALG
             if(write_cj) {
 #endif
+                aj[0] = cj*UNROLLJ + 0;
+                aj[1] = cj*UNROLLJ + 1;
+                aj[2] = cj*UNROLLJ + 2;
+                aj[3] = cj*UNROLLJ + 3;
                 //TODO: REDUCE SUM
                 ldm_f[aj[0]*F_STRIDE+XX-start_f]  -= fx.p[0];
                 ldm_f[aj[0]*F_STRIDE+YY-start_f]  -= fy.p[0];
