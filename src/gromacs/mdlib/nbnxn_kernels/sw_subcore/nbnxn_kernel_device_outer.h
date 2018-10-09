@@ -205,7 +205,8 @@ NBK_FUNC_NAME(_VgrpF)
     // ========== GET MY WORKOAD =========== }
 
     // =========== INIT DATA =============
-    real cpot = ic.repulsion_shift.cpot;
+    realv4 cpot;
+    cpot.v = ic.repulsion_shift.cpot;
 #ifdef CALC_COUL_RF
     k_rf2 = 2*ic.k_rf;
 #ifdef CALC_ENERGIES

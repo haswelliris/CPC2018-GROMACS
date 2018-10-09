@@ -118,15 +118,17 @@
             skipmask.p[1] = !(cj == ci_sh && 1 <= i);
             skipmask.p[2] = !(cj == ci_sh && 2 <= i);
             skipmask.p[3] = !(cj == ci_sh && 3 <= i);
+            
 #endif  // EXCL_FORCES
 #else
 #define interact one
             skipmask.v = 1.0;
 #endif  // CHECK_EXCLS
-            ////DEVICE_CODE_FENCE();
+            //DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.1.\n");
 #endif
+            DEVICE_CODE_FENCE();
             //aj = cj*UNROLLJ + j;
             aj[0] = cj*UNROLLJ + 0;
             aj[1] = cj*UNROLLJ + 1;
@@ -209,7 +211,7 @@
             skipmask.p[2] = (rsq.p[2] >= rcut2) ? 0.0 : skipmask.p[2];
             skipmask.p[3] = (rsq.p[3] >= rcut2) ? 0.0 : skipmask.p[3];
             // skipmask.v = simd_vsellt(rsq.v - rcut2, skipmask.v, zero.v);
-            ////DEVICE_CODE_FENCE();
+            DEVICE_CODE_FENCE();
 #ifdef DEBUG_SDLB
             TLOG("kaCHI 7.2.\n");
             //wait_host(device_core_id);
@@ -240,20 +242,20 @@
              * rinvsix when computing LJ, and/or overflowing
              * the Coulomb table during lookup. */
             //rinv = rinv * skipmask;
-            rinv.p[0] = rinv.p[0] * skipmask.p[0];
-            rinv.p[1] = rinv.p[1] * skipmask.p[1];
-            rinv.p[2] = rinv.p[2] * skipmask.p[2];
-            rinv.p[3] = rinv.p[3] * skipmask.p[3];
+            // rinv.p[0] = rinv.p[0] * skipmask.p[0];
+            // rinv.p[1] = rinv.p[1] * skipmask.p[1];
+            // rinv.p[2] = rinv.p[2] * skipmask.p[2];
+            // rinv.p[3] = rinv.p[3] * skipmask.p[3];
             // FIXME !!!!!!!!
-            // rinv.v = rinv.v * skipmask.v;
+            rinv.v  = rinv.v*skipmask.v;
 
             //rinvsq  = rinv*rinv;
-            rinvsq.p[0]  = rinv.p[0]*rinv.p[0];
-            rinvsq.p[1]  = rinv.p[1]*rinv.p[1];
-            rinvsq.p[2]  = rinv.p[2]*rinv.p[2];
-            rinvsq.p[3]  = rinv.p[3]*rinv.p[3];
+            // rinvsq.p[0]  = rinv.p[0]*rinv.p[0];
+            // rinvsq.p[1]  = rinv.p[1]*rinv.p[1];
+            // rinvsq.p[2]  = rinv.p[2]*rinv.p[2];
+            // rinvsq.p[3]  = rinv.p[3]*rinv.p[3];
             // FIXME !!!!!!!!
-            // rinvsq.v  = rinv.v*rinv.v;
+            rinvsq.v  = rinv.v*rinv.v;
 
 #ifdef HALF_LJ
             if (i < UNROLLI/2)
@@ -275,43 +277,43 @@
                 c12.p[2]      = nbfp[type_i_off+Ctj_p[2]*2+1];
                 c6.p [3]      = nbfp[type_i_off+Ctj_p[3]*2  ];
                 c12.p[3]      = nbfp[type_i_off+Ctj_p[3]*2+1];
-
+                DEVICE_CODE_FENCE();
 #if defined LJ_CUT
                 //rinvsix = interact*rinvsq*rinvsq*rinvsq;
-                rinvsix.p[0] = interact.p[0]*rinvsq.p[0]*rinvsq.p[0]*rinvsq.p[0];
-                rinvsix.p[1] = interact.p[1]*rinvsq.p[1]*rinvsq.p[1]*rinvsq.p[1];
-                rinvsix.p[2] = interact.p[2]*rinvsq.p[2]*rinvsq.p[2]*rinvsq.p[2];
-                rinvsix.p[3] = interact.p[3]*rinvsq.p[3]*rinvsq.p[3]*rinvsq.p[3];
+                // rinvsix.p[0] = interact.p[0]*rinvsq.p[0]*rinvsq.p[0]*rinvsq.p[0];
+                // rinvsix.p[1] = interact.p[1]*rinvsq.p[1]*rinvsq.p[1]*rinvsq.p[1];
+                // rinvsix.p[2] = interact.p[2]*rinvsq.p[2]*rinvsq.p[2]*rinvsq.p[2];
+                // rinvsix.p[3] = interact.p[3]*rinvsq.p[3]*rinvsq.p[3]*rinvsq.p[3];
                 // FIXME !!!!!!!!
-                // rinvsix.v = interact.v*rinvsq.v*rinvsq.v*rinvsq.v;
+                rinvsix.v = interact.v*rinvsq.v*rinvsq.v*rinvsq.v;
                 //FrLJ6   = c6*rinvsix;
-                FrLJ6.p[0]   = c6.p[0]*rinvsix.p[0];
-                FrLJ6.p[1]   = c6.p[1]*rinvsix.p[1];
-                FrLJ6.p[2]   = c6.p[2]*rinvsix.p[2];
-                FrLJ6.p[3]   = c6.p[3]*rinvsix.p[3];
+                // FrLJ6.p[0]   = c6.p[0]*rinvsix.p[0];
+                // FrLJ6.p[1]   = c6.p[1]*rinvsix.p[1];
+                // FrLJ6.p[2]   = c6.p[2]*rinvsix.p[2];
+                // FrLJ6.p[3]   = c6.p[3]*rinvsix.p[3];
                 // FIXME !!!!!!!!
-                // FrLJ6.v   = c6.v*rinvsix.v;
-                //FrLJ12  = c12*rinvsix*rinvsix;
-                FrLJ12.p[0]  = c12.p[0]*rinvsix.p[0]*rinvsix.p[0];
-                FrLJ12.p[1]  = c12.p[1]*rinvsix.p[1]*rinvsix.p[1];
-                FrLJ12.p[2]  = c12.p[2]*rinvsix.p[2]*rinvsix.p[2];
-                FrLJ12.p[3]  = c12.p[3]*rinvsix.p[3]*rinvsix.p[3];
-                // FrLJ12.v  = c12.v*rinvsix.v*rinvsix.v;
+                FrLJ6.v   = c6.v*rinvsix.v;
+                // FrLJ12  = c12*rinvsix*rinvsix;
+                // FrLJ12.p[0]  = c12.p[0]*rinvsix.p[0]*rinvsix.p[0];
+                // FrLJ12.p[1]  = c12.p[1]*rinvsix.p[1]*rinvsix.p[1];
+                // FrLJ12.p[2]  = c12.p[2]*rinvsix.p[2]*rinvsix.p[2];
+                // FrLJ12.p[3]  = c12.p[3]*rinvsix.p[3]*rinvsix.p[3];
+                FrLJ12.v  = c12.v*rinvsix.v*rinvsix.v;
                 //frLJ    = FrLJ12 - FrLJ6;
-                frLJ.p[0]    = FrLJ12.p[0] - FrLJ6.p[0];
-                frLJ.p[1]    = FrLJ12.p[1] - FrLJ6.p[1];
-                frLJ.p[2]    = FrLJ12.p[2] - FrLJ6.p[2];
-                frLJ.p[3]    = FrLJ12.p[3] - FrLJ6.p[3];
+                // frLJ.p[0]    = FrLJ12.p[0] - FrLJ6.p[0];
+                // frLJ.p[1]    = FrLJ12.p[1] - FrLJ6.p[1];
+                // frLJ.p[2]    = FrLJ12.p[2] - FrLJ6.p[2];
+                // frLJ.p[3]    = FrLJ12.p[3] - FrLJ6.p[3];
                 // FIXME !!!!!!!!
-                // frLJ.v    = FrLJ12.v - FrLJ6.v;
+                frLJ.v    = FrLJ12.v - FrLJ6.v;
                 /* 7 flops for r^-2 + LJ force */
 #if defined CALC_ENERGIES
                 //VLJ     = (FrLJ12 + c12*cpot)/12 - (FrLJ6 + c6*cpot)/6;
-                VLJ.p[0]     = (FrLJ12.p[0] + c12.p[0]*cpot)/12 - (FrLJ6.p[0] + c6.p[0]*cpot)/6;
-                VLJ.p[1]     = (FrLJ12.p[1] + c12.p[1]*cpot)/12 - (FrLJ6.p[1] + c6.p[1]*cpot)/6;
-                VLJ.p[2]     = (FrLJ12.p[2] + c12.p[2]*cpot)/12 - (FrLJ6.p[2] + c6.p[2]*cpot)/6;
-                VLJ.p[3]     = (FrLJ12.p[3] + c12.p[3]*cpot)/12 - (FrLJ6.p[3] + c6.p[3]*cpot)/6;
-                // VLJ.v     = (FrLJ12.v + c12.v*cpot)/12 - (FrLJ6.v + c6.v*cpot)/6;
+                // VLJ.p[0]     = (FrLJ12.p[0] + c12.p[0]*cpot)/12 - (FrLJ6.p[0] + c6.p[0]*cpot)/6;
+                // VLJ.p[1]     = (FrLJ12.p[1] + c12.p[1]*cpot)/12 - (FrLJ6.p[1] + c6.p[1]*cpot)/6;
+                // VLJ.p[2]     = (FrLJ12.p[2] + c12.p[2]*cpot)/12 - (FrLJ6.p[2] + c6.p[2]*cpot)/6;
+                // VLJ.p[3]     = (FrLJ12.p[3] + c12.p[3]*cpot)/12 - (FrLJ6.p[3] + c6.p[3]*cpot)/6;
+                VLJ.v     = (c12.v*cpot.v+FrLJ12.v)/12.0 - (c6.v*cpot.v+FrLJ6.v)/6.0;
                 /* 7 flops for LJ energy */
 #endif
 #endif
@@ -327,21 +329,21 @@
                  */
                 /* Need to zero the interaction if there should be exclusion. */
                 //VLJ     = VLJ * interact;
-                VLJ.p[0]     = VLJ.p[0] * interact.p[0];
-                VLJ.p[1]     = VLJ.p[1] * interact.p[1];
-                VLJ.p[2]     = VLJ.p[2] * interact.p[2];
-                VLJ.p[3]     = VLJ.p[3] * interact.p[3];
-                // VLJ.v     = VLJ.v * interact.v;
+                // VLJ.p[0]     = VLJ.p[0] * interact.p[0];
+                // VLJ.p[1]     = VLJ.p[1] * interact.p[1];
+                // VLJ.p[2]     = VLJ.p[2] * interact.p[2];
+                // VLJ.p[3]     = VLJ.p[3] * interact.p[3];
+                VLJ.v     = VLJ.v * interact.v;
 #endif
 
 #if defined CALC_ENERGIES
                 /* Need to zero the interaction if r >= rcut */
                 //VLJ     = VLJ * skipmask;
-                VLJ.p[0]     = VLJ.p[0] * skipmask.p[0];
-                VLJ.p[1]     = VLJ.p[1] * skipmask.p[1];
-                VLJ.p[2]     = VLJ.p[2] * skipmask.p[2];
-                VLJ.p[3]     = VLJ.p[3] * skipmask.p[3];
-                // VLJ.v     = VLJ.v * skipmask.v;
+                // VLJ.p[0]     = VLJ.p[0] * skipmask.p[0];
+                // VLJ.p[1]     = VLJ.p[1] * skipmask.p[1];
+                // VLJ.p[2]     = VLJ.p[2] * skipmask.p[2];
+                // VLJ.p[3]     = VLJ.p[3] * skipmask.p[3];
+                VLJ.v     = VLJ.v * skipmask.v;
                 /* 1 more flop for LJ energy */
 #endif
 
@@ -365,33 +367,34 @@
              * advance. */
             //qq = skipmask * qi[i] * q[aj];
             //qq = skipmask * qi[i] * Cqj_p[j];
-            qq.p[0] = skipmask.p[0] * qi[i] * Cqj_p[0];
-            qq.p[1] = skipmask.p[1] * qi[i] * Cqj_p[1];
-            qq.p[2] = skipmask.p[2] * qi[i] * Cqj_p[2];
-            qq.p[3] = skipmask.p[3] * qi[i] * Cqj_p[3];
-            // realv4 qiV, qjV;
-            // qiV.v = qi[i];
+            // qq.p[0] = skipmask.p[0] * qi[i] * Cqj_p[0];
+            // qq.p[1] = skipmask.p[1] * qi[i] * Cqj_p[1];
+            // qq.p[2] = skipmask.p[2] * qi[i] * Cqj_p[2];
+            // qq.p[3] = skipmask.p[3] * qi[i] * Cqj_p[3];
+            realv4 qiV, qjV;
+            qiV.v = qi[i];
             // qjV.p[0] = Cqj_p[0];
             // qjV.p[1] = Cqj_p[1];
             // qjV.p[2] = Cqj_p[2];
             // qjV.p[3] = Cqj_p[3];
-            // qq.v = skipmask.v * qiV.v * qjV.v;
+            simd_load(qjV.v, &Cqj_p[0]);
+            qq.v = skipmask.v * qiV.v * qjV.v;
 
 #ifdef CALC_COUL_RF
             //fcoul  = qq*(interact*rinv*rinvsq - k_rf2);
-            fcoul.p[0]  = qq.p[0]*(interact.p[0]*rinv.p[0]*rinvsq.p[0] - k_rf2);
-            fcoul.p[1]  = qq.p[1]*(interact.p[1]*rinv.p[1]*rinvsq.p[1] - k_rf2);
-            fcoul.p[2]  = qq.p[2]*(interact.p[2]*rinv.p[2]*rinvsq.p[2] - k_rf2);
-            fcoul.p[3]  = qq.p[3]*(interact.p[3]*rinv.p[3]*rinvsq.p[3] - k_rf2);
-            // fcoul.v  = qq.v*(interact.v*rinv.v*rinvsq.v - k_rf2);
+            // fcoul.p[0]  = qq.p[0]*(interact.p[0]*rinv.p[0]*rinvsq.p[0] - k_rf2);
+            // fcoul.p[1]  = qq.p[1]*(interact.p[1]*rinv.p[1]*rinvsq.p[1] - k_rf2);
+            // fcoul.p[2]  = qq.p[2]*(interact.p[2]*rinv.p[2]*rinvsq.p[2] - k_rf2);
+            // fcoul.p[3]  = qq.p[3]*(interact.p[3]*rinv.p[3]*rinvsq.p[3] - k_rf2);
+            fcoul.v  = qq.v*(interact.v*rinv.v*rinvsq.v - k_rf2);
             /* 4 flops for RF force */
 #ifdef CALC_ENERGIES
             //vcoul  = qq*(interact*rinv + k_rf*rsq - c_rf);
-            vcoul.p[0]  = qq.p[0]*(interact.p[0]*rinv.p[0] + k_rf*rsq.p[0] - c_rf);
-            vcoul.p[1]  = qq.p[1]*(interact.p[1]*rinv.p[1] + k_rf*rsq.p[1] - c_rf);
-            vcoul.p[2]  = qq.p[2]*(interact.p[2]*rinv.p[2] + k_rf*rsq.p[2] - c_rf);
-            vcoul.p[3]  = qq.p[3]*(interact.p[3]*rinv.p[3] + k_rf*rsq.p[3] - c_rf);
-            // vcoul.v  = qq.v*(interact.v*rinv.v + k_rf*rsq.v - c_rf);
+            // vcoul.p[0]  = qq.p[0]*(interact.p[0]*rinv.p[0] + k_rf*rsq.p[0] - c_rf);
+            // vcoul.p[1]  = qq.p[1]*(interact.p[1]*rinv.p[1] + k_rf*rsq.p[1] - c_rf);
+            // vcoul.p[2]  = qq.p[2]*(interact.p[2]*rinv.p[2] + k_rf*rsq.p[2] - c_rf);
+            // vcoul.p[3]  = qq.p[3]*(interact.p[3]*rinv.p[3] + k_rf*rsq.p[3] - c_rf);
+            vcoul.v  = qq.v*(interact.v*rinv.v + k_rf*rsq.v - c_rf);
             /* 4 flops for RF energy */
 #endif // CALC_ENERGIES
 #endif // CALC_COUL_RF
@@ -402,11 +405,12 @@
             TLOG("rsq =%f, tabq_scale =%f\n", rsq, ic.tabq_scale);
 #endif //DEBUG_FPEX
             //rs     = rsq*rinv*ic.tabq_scale;
-            rs.p[0]     = rsq.p[0]*rinv.p[0]*ic.tabq_scale;
-            rs.p[1]     = rsq.p[1]*rinv.p[1]*ic.tabq_scale;
-            rs.p[2]     = rsq.p[2]*rinv.p[2]*ic.tabq_scale;
-            rs.p[3]     = rsq.p[3]*rinv.p[3]*ic.tabq_scale;
-            // rs.v     = rsq.v*rinv.v*ic.tabq_scale;
+            // rs.p[0]     = rsq.p[0]*rinv.p[0]*ic.tabq_scale;
+            // rs.p[1]     = rsq.p[1]*rinv.p[1]*ic.tabq_scale;
+            // rs.p[2]     = rsq.p[2]*rinv.p[2]*ic.tabq_scale;
+            // rs.p[3]     = rsq.p[3]*rinv.p[3]*ic.tabq_scale;
+            rs.v     = rsq.v*rinv.v*ic.tabq_scale;
+            DEVICE_CODE_FENCE();
             //ri     = (int)rs;
             ri[0]     = (int)rs.p[0];
             ri[1]     = (int)rs.p[1];
@@ -453,10 +457,12 @@
 #ifdef CALC_ENERGIES
             V.p[3] = tab_coul_FDV0[ri[3]*4+2];
 #endif
-            fexcl.p[0]  = F.p[0] + frac.p[0]*D.p[0];
-            fexcl.p[1]  = F.p[1] + frac.p[1]*D.p[1];
-            fexcl.p[2]  = F.p[2] + frac.p[2]*D.p[2];
-            fexcl.p[3]  = F.p[3] + frac.p[3]*D.p[3];
+            DEVICE_CODE_FENCE();
+            // fexcl.p[0]  = F.p[0] + frac.p[0]*D.p[0];
+            // fexcl.p[1]  = F.p[1] + frac.p[1]*D.p[1];
+            // fexcl.p[2]  = F.p[2] + frac.p[2]*D.p[2];
+            // fexcl.p[3]  = F.p[3] + frac.p[3]*D.p[3];
+            fexcl.v  = frac.v*D.v+F.v;
             //fexcl  = (1 - frac)*tab_coul_FDV0[ri*2] + frac*tab_coul_FDV0[(ri+1)*2];
 #else
             /* fexcl = (1-frac) * F_i + frac * F_(i+1) */
@@ -467,11 +473,11 @@
             fexcl.p[3]  = (1.0 - frac.p[3])*tab_coul_F[ri[3]] + frac.p[3]*tab_coul_F[ri[3]+1];
 #endif // GMX_DOUBLE
             //fcoul  = interact*rinvsq - fexcl;
-            fcoul.p[0]  = interact.p[0]*rinvsq.p[0] - fexcl.p[0];
-            fcoul.p[1]  = interact.p[1]*rinvsq.p[1] - fexcl.p[1];
-            fcoul.p[2]  = interact.p[2]*rinvsq.p[2] - fexcl.p[2];
-            fcoul.p[3]  = interact.p[3]*rinvsq.p[3] - fexcl.p[3];
-            //fcoul.v  = interact.v*rinvsq.v-fexcl.v;
+            // fcoul.p[0]  = interact.p[0]*rinvsq.p[0] - fexcl.p[0];
+            // fcoul.p[1]  = interact.p[1]*rinvsq.p[1] - fexcl.p[1];
+            // fcoul.p[2]  = interact.p[2]*rinvsq.p[2] - fexcl.p[2];
+            // fcoul.p[3]  = interact.p[3]*rinvsq.p[3] - fexcl.p[3];
+            fcoul.v  = interact.v*rinvsq.v-fexcl.v;
             /* 7 flops for float 1/r-table force */
 #ifdef CALC_ENERGIES
             ////DEVICE_CODE_FENCE();
@@ -485,22 +491,22 @@
             //                -halfsp*frac*(tab_coul_FDV0[ri*4] + fexcl)));
 
 
-            vcoul.p[0]  = qq.p[0]*(interact.p[0]*(rinv.p[0] - ic.sh_ewald)
-                         -(V.p[0]
-                           -halfsp*frac.p[0]*(F.p[0] + fexcl.p[0])));
-            vcoul.p[1]  = qq.p[1]*(interact.p[1]*(rinv.p[1] - ic.sh_ewald)
-                         -(V.p[1]
-                           -halfsp*frac.p[1]*(F.p[1] + fexcl.p[1])));
-            vcoul.p[2]  = qq.p[2]*(interact.p[2]*(rinv.p[2] - ic.sh_ewald)
-                         -(V.p[2]
-                           -halfsp*frac.p[2]*(F.p[2] + fexcl.p[2])));
-            vcoul.p[3]  = qq.p[3]*(interact.p[3]*(rinv.p[3] - ic.sh_ewald)
-                         -(V.p[3]
-                           -halfsp*frac.p[3]*(F.p[3] + fexcl.p[3])));
+            // vcoul.p[0]  = qq.p[0]*(interact.p[0]*(rinv.p[0] - ic.sh_ewald)
+            //              -(V.p[0]
+            //                -halfsp*frac.p[0]*(F.p[0] + fexcl.p[0])));
+            // vcoul.p[1]  = qq.p[1]*(interact.p[1]*(rinv.p[1] - ic.sh_ewald)
+            //              -(V.p[1]
+            //                -halfsp*frac.p[1]*(F.p[1] + fexcl.p[1])));
+            // vcoul.p[2]  = qq.p[2]*(interact.p[2]*(rinv.p[2] - ic.sh_ewald)
+            //              -(V.p[2]
+            //                -halfsp*frac.p[2]*(F.p[2] + fexcl.p[2])));
+            // vcoul.p[3]  = qq.p[3]*(interact.p[3]*(rinv.p[3] - ic.sh_ewald)
+            //              -(V.p[3]
+            //                -halfsp*frac.p[3]*(F.p[3] + fexcl.p[3])));
             // Unaligned EX
-            // vcoul.v  = qq.v*(interact.v*(rinv.v - ic.sh_ewald)
-            //              -(V.v
-            //                -halfsp*frac.v*(F.v + fexcl.v)));
+            vcoul.v  = qq.v*(interact.v*(rinv.v - ic.sh_ewald)
+                         -(V.v
+                           -halfsp*frac.v*(F.v + fexcl.v)));
 
                            
             // vcoul  = qq*(interact*(rinv - ic.sh_ewald)
