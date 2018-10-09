@@ -401,17 +401,40 @@ void subcore_loadbalance(nbnxn_atomdata_t *nbat, nbnxn_pairlist_t *nbl, int *f_s
     free(workload);
 }
 
-void
-nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
-                 const nbnxn_atomdata_t     *nbat,
-                 const interaction_const_t  *ic,
-                 rvec                       *shift_vec,
-                 int                         force_flags,
-                 int                         clearF,
-                 real                       *fshift,
-                 real                       *Vc,
-                 real                       *Vvdw,
-                 gmx_wallcycle_t             wcycle)
+struct 
+{
+    nbnxn_pairlist_set_t *nbl_list;
+    nbnxn_atomdata_t     *nbat;
+    interaction_const_t  *ic;
+    rvec                 *shift_vec;
+    int                   force_flags;
+    int                   clearF;
+    real                 *fshift;
+    real                 *Vc;
+    real                 *Vvdw;
+    gmx_wallcycle_t      wcycle;
+
+    // ===============================
+
+    int              *f_start;
+    int              *f_end;
+
+    real             *expand_fshift;
+    real             *expand_Vvdw;
+    real             *expand_Vc;
+
+    real             *other_f;
+    nbnxn_pairlist_t  other_nbl;
+    nbnxn_atomdata_t  other_nbat;
+    rvec             *other_shift_vec;
+    real             *other_tabq_coul_F;
+    real             *other_tabq_coul_V;
+    real             *other_tabq_coul_FDV0;
+
+    real             *fshift_p;
+} _kernel_para;
+
+void nbnxn_kernel_ref_launch()
 {
     int                nnbl;
     nbnxn_pairlist_t **nbl;
@@ -420,16 +443,16 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
     int                nb;
     int                nthreads gmx_unused;
 
-    nnbl = nbl_list->nnbl;
-    nbl  = nbl_list->nbl;
+    nnbl = _kernel_para.nbl_list->nnbl;
+    nbl  = _kernel_para.nbl_list->nbl;
 
-    if (EEL_RF(ic->eeltype) || ic->eeltype == eelCUT)
+    if (EEL_RF(_kernel_para.ic->eeltype) || _kernel_para.ic->eeltype == eelCUT)
     {
         coult = coultRF;
     }
     else
     {
-        if (ic->rcoulomb == ic->rvdw)
+        if (_kernel_para.ic->rcoulomb == _kernel_para.ic->rvdw)
         {
             coult = coultTAB;
         }
@@ -439,9 +462,9 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
         }
     }
 
-    if (ic->vdwtype == evdwCUT)
+    if (_kernel_para.ic->vdwtype == evdwCUT)
     {
-        switch (ic->vdw_modifier)
+        switch (_kernel_para.ic->vdw_modifier)
         {
             case eintmodPOTSHIFT:
             case eintmodNONE:
@@ -458,16 +481,16 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                 break;
         }
     }
-    else if (ic->vdwtype == evdwPME)
+    else if (_kernel_para.ic->vdwtype == evdwPME)
     {
-        if (ic->ljpme_comb_rule == ljcrGEOM)
+        if (_kernel_para.ic->ljpme_comb_rule == ljcrGEOM)
         {
-            assert(nbat->comb_rule == ljcrGEOM);
+            assert(_kernel_para.nbat->comb_rule == ljcrGEOM);
             vdwt = vdwtEWALDGEOM;
         }
         else
         {
-            assert(nbat->comb_rule == ljcrLB);
+            assert(_kernel_para.nbat->comb_rule == ljcrLB);
             vdwt = vdwtEWALDLB;
         }
     }
@@ -480,109 +503,91 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
 #pragma omp parallel for schedule(static) num_threads(nthreads)
     for (nb = 0; nb < nnbl; nb++)
     {
-        int *f_start = (int*)malloc(64*sizeof(int));
-    	memset(f_start, 0, 64*sizeof(int));
-	    int *f_end = (int*)malloc(64*sizeof(int));
-	    memset(f_end, 0, 64*sizeof(int));
+        _kernel_para.f_start = (int*)malloc(64*sizeof(int));
+    	memset(_kernel_para.f_start, 0, 64*sizeof(int));
+	    _kernel_para.f_end = (int*)malloc(64*sizeof(int));
+	    memset(_kernel_para.f_end, 0, 64*sizeof(int));
         //wallcycle_sub_start(wcycle, ewcsMEMCPY);
-        subcore_loadbalance(nbat, nbl[nb], f_start, f_end);
+        subcore_loadbalance(_kernel_para.nbat, nbl[nb], _kernel_para.f_start, _kernel_para.f_end);
         //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
         nbnxn_atomdata_output_t *out;
-        real                    *fshift_p;
 
-        out = &nbat->out[nb];
+        out = &_kernel_para.nbat->out[nb];
 
-        if (clearF == enbvClearFYes)
+        if (_kernel_para.clearF == enbvClearFYes)
         {
-            clear_f(nbat, nb, out->f);
+            clear_f(_kernel_para.nbat, nb, out->f);
         }
 
-        if ((force_flags & GMX_FORCE_VIRIAL) && nnbl == 1)
+        if ((_kernel_para.force_flags & GMX_FORCE_VIRIAL) && nnbl == 1)
         {
-            fshift_p = fshift;
+            _kernel_para.fshift_p = _kernel_para.fshift;
         }
         else
         {
-            fshift_p = out->fshift;
+            _kernel_para.fshift_p = out->fshift;
 
-            if (clearF == enbvClearFYes)
+            if (_kernel_para.clearF == enbvClearFYes)
             {
-                clear_fshift(fshift_p);
+                clear_fshift(_kernel_para.fshift_p);
             }
         }
         //wallcycle_sub_start(wcycle, ewcsMEMCPY);
-        real *expand_fshift = (real*)malloc(SHIFTS*DIM*64*sizeof(real));
+        _kernel_para.expand_fshift = (real*)malloc(SHIFTS*DIM*64*sizeof(real));
 
-        real *other_f       = (real*)malloc(nbat->natoms*nbat->fstride*sizeof(real));
-        memcpy(other_f, out->f, nbat->natoms*nbat->fstride*sizeof(real));
+        _kernel_para.other_f       = (real*)malloc(
+            _kernel_para.nbat->natoms*_kernel_para.nbat->fstride*sizeof(real));
+        memcpy(_kernel_para.other_f, out->f, 
+               _kernel_para.nbat->natoms*_kernel_para.nbat->fstride*sizeof(real));
 
-        nbnxn_pairlist_t other_nbl;
-        deep_copy_nbl(&other_nbl, nbl[nb], 1, 0);
+        deep_copy_nbl(&_kernel_para.other_nbl, nbl[nb], 1, 0);
+        deep_copy_nbat(&_kernel_para.other_nbat, _kernel_para.nbat, 1, 0);
 
-        nbnxn_atomdata_t other_nbat;
-        deep_copy_nbat(&other_nbat, nbat, 1, 0);
+        _kernel_para.other_shift_vec = (rvec*)malloc(SHIFTS*DIM*sizeof(real));
+        memcpy(_kernel_para.other_shift_vec, _kernel_para.shift_vec, SHIFTS*DIM*sizeof(real));
 
-        rvec *other_shift_vec = (rvec*)malloc(SHIFTS*DIM*sizeof(real));
-        memcpy(other_shift_vec, shift_vec, SHIFTS*DIM*sizeof(real));
-
-        real *other_tabq_coul_F = NULL;
-        real *other_tabq_coul_V = NULL;
-        real *other_tabq_coul_FDV0 = NULL;
+        _kernel_para.other_tabq_coul_F = NULL;
+        _kernel_para.other_tabq_coul_V = NULL;
+        _kernel_para.other_tabq_coul_FDV0 = NULL;
 
 #ifndef GMX_DOUBLE
-        other_tabq_coul_FDV0 = (real*)malloc(ic->tabq_size*4*sizeof(real));
-        memcpy(other_tabq_coul_FDV0, ic->tabq_coul_FDV0, ic->tabq_size*4*sizeof(real));
+        _kernel_para.other_tabq_coul_FDV0 = (real*)malloc(_kernel_para.ic->tabq_size*4*sizeof(real));
+        memcpy(_kernel_para.other_tabq_coul_FDV0, _kernel_para.ic->tabq_coul_FDV0, 
+               _kernel_para.ic->tabq_size*4*sizeof(real));
 #else
-        other_tabq_coul_F    = (real*)malloc(ic->tabq_size*sizeof(real));
-        other_tabq_coul_V    = (real*)malloc(ic->tabq_size*sizeof(real));
-        memcpy(other_tabq_coul_F, ic->tabq_coul_F, ic->tabq_size*sizeof(real));
-        memcpy(other_tabq_coul_V, ic->tabq_coul_V, ic->tabq_size*sizeof(real));
+        _kernel_para.other_tabq_coul_F    = (real*)malloc(_kernel_para.ic->tabq_size*sizeof(real));
+        _kernel_para.other_tabq_coul_V    = (real*)malloc(_kernel_para.ic->tabq_size*sizeof(real));
+        memcpy(_kernel_para.other_tabq_coul_F, _kernel_para.ic->tabq_coul_F, 
+               _kernel_para.ic->tabq_size*sizeof(real));
+        memcpy(_kernel_para.other_tabq_coul_V, _kernel_para.ic->tabq_coul_V, 
+               _kernel_para.ic->tabq_size*sizeof(real));
 #endif
         //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
         // if the tabq_coul_FDV0 can load to LDM?
         // TLOG("tabq_coul_FDV0_SZ =%d Byte\n", ic->tabq_size*4*sizeof(real));
         // TLOG("tabq_size =%d, ntype =%d, natoms =%d\n", ic->tabq_size, nbat->ntype, nbat->natoms);
-#ifdef DEBUG_SDLB
-        TLOG("kaCHI sizeof(nbnxn_pairlist_t) =%d\n", sizeof(nbnxn_pairlist_t));
-#endif
-#ifdef HAHAHAHAHAHAHAHA
-        if(coult == 1)
-        {
-            usleep(40000);
-        }
-        else
-        {
-            usleep(400000);
-        }
-#endif
-        if (!(force_flags & GMX_FORCE_ENERGY))
+        if (!(_kernel_para.force_flags & GMX_FORCE_ENERGY))
         {
             host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
             host_out_param[FUNC_TYPE] = FUNC_NO_ENER;
             host_out_param[FUNC_I] = coult;
             host_out_param[FUNC_J] = vdwt;
             host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
-            host_func_para.nbl = &other_nbl; // read only
-            host_func_para.nbat = &other_nbat; // read only
-            host_func_para.ic = ic;      // read only
-            host_func_para.shift_vec = other_shift_vec; // read only
-            host_func_para.f = other_f; // write only, reduce FIN
+            host_func_para.nbl = &_kernel_para.other_nbl; // read only
+            host_func_para.nbat = &_kernel_para.other_nbat; // read only
+            host_func_para.ic = _kernel_para.ic;      // read only
+            host_func_para.shift_vec = _kernel_para.other_shift_vec; // read only
+            host_func_para.f = _kernel_para.other_f; // write only, reduce FIN
             host_func_para.expand_Vvdw = NULL;// write only, reduce FIN
             host_func_para.expand_Vc = NULL;// write only, reduce FIN
-            host_func_para.expand_fshift = expand_fshift;// write only, reduce FIN
-            host_func_para.tabq_coul_F = other_tabq_coul_F;// read only
-            host_func_para.tabq_coul_V = other_tabq_coul_V;// read only
-            host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;// read only
-            host_func_para.f_start = f_start;
-            host_func_para.f_end   = f_end;
-#ifdef SW_HOST_LOG /* in SwConfig */
-            if((host_param.host_rank + host_notice_counter) % 64 == 0)
-            {
-                OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_NO_ENER, coult, vdwt);
-            }
-#endif
+            host_func_para.expand_fshift = _kernel_para.expand_fshift;// write only, reduce FIN
+            host_func_para.tabq_coul_F = _kernel_para.other_tabq_coul_F;// read only
+            host_func_para.tabq_coul_V = _kernel_para.other_tabq_coul_V;// read only
+            host_func_para.tabq_coul_FDV0 = _kernel_para.other_tabq_coul_FDV0;// read only
+            host_func_para.f_start = _kernel_para.f_start;
+            host_func_para.f_end   = _kernel_para.f_end;
             notice_device();
-            wait_device();
+            //wait_device();
 
             /* Don't calculate energies */
             //fake_device_run();
@@ -595,81 +600,48 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             out->Vvdw[0] = 0;
             out->Vc[0]   = 0;
 
-            real *expand_Vvdw   = (real*)malloc(64*sizeof(real));
-            real *expand_Vc     = (real*)malloc(64*sizeof(real));
+            _kernel_para.expand_Vvdw   = (real*)malloc(64*sizeof(real));
+            _kernel_para.expand_Vc     = (real*)malloc(64*sizeof(real));
 
             host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
             host_out_param[FUNC_TYPE] = FUNC_ENER;
             host_out_param[FUNC_I] = coult;
             host_out_param[FUNC_J] = vdwt;
             host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
-            host_func_para.nbl = &other_nbl;
-            host_func_para.nbat = &other_nbat;
-            host_func_para.ic = ic;
-            host_func_para.shift_vec = other_shift_vec;
-            host_func_para.f = other_f;
-            host_func_para.expand_Vvdw = expand_Vvdw;
-            host_func_para.expand_Vc = expand_Vc;
-            host_func_para.expand_fshift = expand_fshift;
-            host_func_para.tabq_coul_F = other_tabq_coul_F;
-            host_func_para.tabq_coul_V = other_tabq_coul_V;
-            host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;
-            host_func_para.f_start = f_start;
-            host_func_para.f_end   = f_end;
-#ifdef SW_HOST_LOG /* in SwConfig */
-            if((host_param.host_rank + host_notice_counter) % 64 == 0)
-            {
-                OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_ENER, coult, vdwt);
-            }
-#endif
+            host_func_para.nbl = &_kernel_para.other_nbl;
+            host_func_para.nbat = &_kernel_para.other_nbat;
+            host_func_para.ic = _kernel_para.ic;
+            host_func_para.shift_vec = _kernel_para.other_shift_vec;
+            host_func_para.f = _kernel_para.other_f;
+            host_func_para.expand_Vvdw = _kernel_para.expand_Vvdw;
+            host_func_para.expand_Vc = _kernel_para.expand_Vc;
+            host_func_para.expand_fshift = _kernel_para.expand_fshift;
+            host_func_para.tabq_coul_F = _kernel_para.other_tabq_coul_F;
+            host_func_para.tabq_coul_V = _kernel_para.other_tabq_coul_V;
+            host_func_para.tabq_coul_FDV0 = _kernel_para.other_tabq_coul_FDV0;
+            host_func_para.f_start = _kernel_para.f_start;
+            host_func_para.f_end   = _kernel_para.f_end;
             notice_device();
-            wait_device();
+            //wait_device();
 
             //fake_device_run();
             //p_nbk_c_ener[coult][vdwt]();
 
-#ifdef DEBUG_FPEX
-            TLOG("MOee 0.\n");
-            //wait_device();
-#endif
             // reduce Vvdw
-            int i;
-            for(i = 0; i < 64 - 1; ++i)
-            {
-                expand_Vvdw[i+1] += expand_Vvdw[i];
-            }
-            out->Vvdw[0] = expand_Vvdw[63];
-            free(expand_Vvdw);
-#ifdef DEBUG_FPEX
-            {
-                TLOG("MOee 0.2\n");
-                if(host_param.host_rank == 0)
-                {
-                    printf("Vc= [");
-                    for(i = 0; i < 64; ++i)
-                    {
-                        printf(" %f", expand_Vc[i]);
-                    }
-                    printf("]\n");
-                    wait_device();
-                }
-                else
-                {
-                    wait_device();
-                }
-            }
-#endif
-            // reduce Vc
-            for(i = 0; i < 64 - 1; ++i)
-            {
-                expand_Vc[i+1] += expand_Vc[i];
-            }
-            out->Vc[0] = expand_Vc[63];
-            free(expand_Vc);
-#ifdef DEBUG_FPEX
-            TLOG("MOee 1.\n");
-            wait_device();
-#endif
+            // int i;
+            // for(i = 0; i < 64 - 1; ++i)
+            // {
+            //     _kernel_para.expand_Vvdw[i+1] += _kernel_para.expand_Vvdw[i];
+            // }
+            // out->Vvdw[0] = _kernel_para.expand_Vvdw[63];
+            // free(_kernel_para.expand_Vvdw);
+            // // reduce Vc
+            // for(i = 0; i < 64 - 1; ++i)
+            // {
+            //     _kernel_para.expand_Vc[i+1] += _kernel_para.expand_Vc[i];
+            // }
+            // out->Vc[0] = _kernel_para.expand_Vc[63];
+            // free(_kernel_para.expand_Vc);
         }
         else
         {
@@ -685,34 +657,371 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
                 out->Vc[i] = 0;
             }
 
-            real *expand_Vvdw   = (real*)malloc(out->nV*64*sizeof(real));
-            real *expand_Vc     = (real*)malloc(out->nV*64*sizeof(real));
+            _kernel_para.expand_Vvdw   = (real*)malloc(out->nV*64*sizeof(real));
+            _kernel_para.expand_Vc     = (real*)malloc(out->nV*64*sizeof(real));
 
             host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
             host_out_param[FUNC_TYPE] = FUNC_ENERGRP;
             host_out_param[FUNC_I] = coult;
             host_out_param[FUNC_J] = vdwt;
             host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
-            host_func_para.nbl = &other_nbl;
-            host_func_para.nbat = &other_nbat;
-            host_func_para.ic = ic;
-            host_func_para.shift_vec = other_shift_vec;
-            host_func_para.f = other_f;
-            host_func_para.expand_Vvdw = expand_Vvdw;
-            host_func_para.expand_Vc = expand_Vc;
-            host_func_para.expand_fshift = expand_fshift;
-            host_func_para.tabq_coul_F = other_tabq_coul_F;
-            host_func_para.tabq_coul_V = other_tabq_coul_V;
-            host_func_para.tabq_coul_FDV0 = other_tabq_coul_FDV0;
-            host_func_para.f_start = f_start;
-            host_func_para.f_end   = f_end;
-#ifdef SW_HOST_LOG /* in SwConfig */
-            if((host_param.host_rank + host_notice_counter) % 64 == 0)
-            {
-                OLOG("FuncType =%d, I =%d, J =%d\n", FUNC_ENERGRP, coult, vdwt);
-            }
-#endif
+            host_func_para.nbl = &_kernel_para.other_nbl;
+            host_func_para.nbat = &_kernel_para.other_nbat;
+            host_func_para.ic = _kernel_para.ic;
+            host_func_para.shift_vec = _kernel_para.other_shift_vec;
+            host_func_para.f = _kernel_para.other_f;
+            host_func_para.expand_Vvdw = _kernel_para.expand_Vvdw;
+            host_func_para.expand_Vc = _kernel_para.expand_Vc;
+            host_func_para.expand_fshift = _kernel_para.expand_fshift;
+            host_func_para.tabq_coul_F = _kernel_para.other_tabq_coul_F;
+            host_func_para.tabq_coul_V = _kernel_para.other_tabq_coul_V;
+            host_func_para.tabq_coul_FDV0 = _kernel_para.other_tabq_coul_FDV0;
+            host_func_para.f_start = _kernel_para.f_start;
+            host_func_para.f_end   = _kernel_para.f_end;
+
             notice_device();
+            //wait_device();
+
+            //fake_device_run();
+#ifdef SW_ENERGRP /* in SwConfig */
+            //p_nbk_c_energrp[coult][vdwt]();
+#else
+            static int grp_call=0;
+            if(grp_call == 0)
+            {
+                OLOG("No Energy Group Function.\n");
+                grp_call = 1;
+            }
+
+#endif
+            // reduce Vvdw
+            // int j;
+            // for(i = 0; i < 64 - 1; ++i)
+            // {
+            //     for (j = 0; j < out->nV; j++)
+            //     {
+            //         _kernel_para.expand_Vvdw[(i+1)*out->nV+j] += _kernel_para.expand_Vvdw[(i)*out->nV+j];
+            //     }
+            // }
+            // for (j = 0; j < out->nV; j++)
+            // {
+            //     out->Vvdw[j] = _kernel_para.expand_Vvdw[(63)*out->nV+j];
+            // }
+            // free(_kernel_para.expand_Vvdw);
+
+            // // reduce Vc
+            // for(i = 0; i < 64 - 1; ++i)
+            // {
+            //     for (j = 0; j < out->nV; j++)
+            //     {
+            //         _kernel_para.expand_Vc[(i+1)*out->nV+j] += _kernel_para.expand_Vc[(i)*out->nV+j];
+            //     }
+            // }
+            // for (j = 0; j < out->nV; j++)
+            // {
+            //     out->Vc[j] = _kernel_para.expand_Vc[(63)*out->nV+j];
+            // }
+            // free(_kernel_para.expand_Vc);
+        }
+
+        // reduce fshift
+//         int i, j;
+//         for(i = 0; i < 64 - 1; ++i)
+//         {
+//             for(j = 0; j < SHIFTS*DIM; ++j)
+//             {
+//                 _kernel_para.expand_fshift[(i+1)*SHIFTS*DIM+j] += _kernel_para.expand_fshift[(i)*SHIFTS*DIM+j];
+//             }
+//         }
+//         for(j = 0; j < SHIFTS*DIM; ++j)
+//         {
+//             _kernel_para.fshift_p[j] += _kernel_para.expand_fshift[63*SHIFTS*DIM+j];
+//         }
+        
+
+//         memcpy(out->f, _kernel_para.other_f, 
+//                _kernel_para.nbat->natoms*_kernel_para.nbat->fstride*sizeof(real));
+//         deep_copy_nbl(nbl[nb], &_kernel_para.other_nbl, 0, 1);
+//         deep_copy_nbat(_kernel_para.nbat, &_kernel_para.other_nbat, 0, 1);
+
+//         free(_kernel_para.expand_fshift);
+//         free(_kernel_para.other_f);
+//         free(_kernel_para.other_shift_vec);
+// #ifndef GMX_DOUBLE
+//         free(_kernel_para.other_tabq_coul_FDV0);
+// #else
+//         free(_kernel_para.other_tabq_coul_F);
+//         free(_kernel_para.other_tabq_coul_V);
+// #endif
+//         free(_kernel_para.f_start);
+//         free(_kernel_para.f_end);
+    }
+
+//     if (_kernel_para.force_flags & GMX_FORCE_ENERGY)
+//     {
+//         reduce_energies_over_lists(_kernel_para.nbat, nnbl, _kernel_para.Vvdw, _kernel_para.Vc);
+//     }
+}
+
+void nbnxn_kernel_ref_reduce()
+{
+    int                nnbl;
+    nbnxn_pairlist_t **nbl;
+    int                coult;
+    int                vdwt;
+    int                nb;
+    int                nthreads gmx_unused;
+
+    nnbl = _kernel_para.nbl_list->nnbl;
+    nbl  = _kernel_para.nbl_list->nbl;
+
+    if (EEL_RF(_kernel_para.ic->eeltype) || _kernel_para.ic->eeltype == eelCUT)
+    {
+        coult = coultRF;
+    }
+    else
+    {
+        if (_kernel_para.ic->rcoulomb == _kernel_para.ic->rvdw)
+        {
+            coult = coultTAB;
+        }
+        else
+        {
+            coult = coultTAB_TWIN;
+        }
+    }
+
+    if (_kernel_para.ic->vdwtype == evdwCUT)
+    {
+        switch (_kernel_para.ic->vdw_modifier)
+        {
+            case eintmodPOTSHIFT:
+            case eintmodNONE:
+                vdwt = vdwtCUT;
+                break;
+            case eintmodFORCESWITCH:
+                vdwt = vdwtFSWITCH;
+                break;
+            case eintmodPOTSWITCH:
+                vdwt = vdwtPSWITCH;
+                break;
+            default:
+                gmx_incons("Unsupported VdW modifier");
+                break;
+        }
+    }
+    else if (_kernel_para.ic->vdwtype == evdwPME)
+    {
+        if (_kernel_para.ic->ljpme_comb_rule == ljcrGEOM)
+        {
+            assert(_kernel_para.nbat->comb_rule == ljcrGEOM);
+            vdwt = vdwtEWALDGEOM;
+        }
+        else
+        {
+            assert(_kernel_para.nbat->comb_rule == ljcrLB);
+            vdwt = vdwtEWALDLB;
+        }
+    }
+    else
+    {
+        gmx_incons("Unsupported vdwtype in nbnxn reference kernel");
+    }
+
+    nthreads = gmx_omp_nthreads_get(emntNonbonded);
+#pragma omp parallel for schedule(static) num_threads(nthreads)
+    for (nb = 0; nb < nnbl; nb++)
+    {
+        // _kernel_para.f_start = (int*)malloc(64*sizeof(int));
+    	// memset(_kernel_para.f_start, 0, 64*sizeof(int));
+	    // _kernel_para.f_end = (int*)malloc(64*sizeof(int));
+	    // memset(_kernel_para.f_end, 0, 64*sizeof(int));
+        // //wallcycle_sub_start(wcycle, ewcsMEMCPY);
+        // subcore_loadbalance(_kernel_para.nbat, nbl[nb], _kernel_para.f_start, _kernel_para.f_end);
+        // //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
+        nbnxn_atomdata_output_t *out;
+
+        out = &_kernel_para.nbat->out[nb];
+
+        // if (_kernel_para.clearF == enbvClearFYes)
+        // {
+        //     clear_f(_kernel_para.nbat, nb, out->f);
+        // }
+
+        // if ((_kernel_para.force_flags & GMX_FORCE_VIRIAL) && nnbl == 1)
+        // {
+        //     _kernel_para.fshift_p = _kernel_para.fshift;
+        // }
+        // else
+        // {
+        //     _kernel_para.fshift_p = out->fshift;
+
+        //     if (_kernel_para.clearF == enbvClearFYes)
+        //     {
+        //         clear_fshift(_kernel_para.fshift_p);
+        //     }
+        // }
+        //wallcycle_sub_start(wcycle, ewcsMEMCPY);
+//         _kernel_para.expand_fshift = (real*)malloc(SHIFTS*DIM*64*sizeof(real));
+
+//         _kernel_para.other_f       = (real*)malloc(
+//             _kernel_para.nbat->natoms*_kernel_para.nbat->fstride*sizeof(real));
+//         memcpy(_kernel_para.other_f, out->f, 
+//                _kernel_para.nbat->natoms*_kernel_para.nbat->fstride*sizeof(real));
+
+//         _kernel_para.other_nbl;
+//         deep_copy_nbl(&_kernel_para.other_nbl, nbl[nb], 1, 0);
+
+//         _kernel_para.other_nbat;
+//         deep_copy_nbat(&_kernel_para.other_nbat, _kernel_para.nbat, 1, 0);
+
+//         _kernel_para.other_shift_vec = (rvec*)malloc(SHIFTS*DIM*sizeof(real));
+//         memcpy(_kernel_para.other_shift_vec, _kernel_para.shift_vec, SHIFTS*DIM*sizeof(real));
+
+//         _kernel_para.other_tabq_coul_F = NULL;
+//         _kernel_para.other_tabq_coul_V = NULL;
+//         _kernel_para.other_tabq_coul_FDV0 = NULL;
+
+// #ifndef GMX_DOUBLE
+//         _kernel_para.other_tabq_coul_FDV0 = (real*)malloc(_kernel_para.ic->tabq_size*4*sizeof(real));
+//         memcpy(_kernel_para.other_tabq_coul_FDV0, _kernel_para.ic->tabq_coul_FDV0, 
+//                _kernel_para.ic->tabq_size*4*sizeof(real));
+// #else
+//         _kernel_para.other_tabq_coul_F    = (real*)malloc(_kernel_para.ic->tabq_size*sizeof(real));
+//         _kernel_para.other_tabq_coul_V    = (real*)malloc(_kernel_para.ic->tabq_size*sizeof(real));
+//         memcpy(_kernel_para.other_tabq_coul_F, _kernel_para.ic->tabq_coul_F, 
+//                _kernel_para.ic->tabq_size*sizeof(real));
+//         memcpy(_kernel_para.other_tabq_coul_V, _kernel_para.ic->tabq_coul_V, 
+//                _kernel_para.ic->tabq_size*sizeof(real));
+// #endif
+        //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
+        // if the tabq_coul_FDV0 can load to LDM?
+        // TLOG("tabq_coul_FDV0_SZ =%d Byte\n", ic->tabq_size*4*sizeof(real));
+        // TLOG("tabq_size =%d, ntype =%d, natoms =%d\n", ic->tabq_size, nbat->ntype, nbat->natoms);
+#ifdef HAHAHAHAHAHAHAHA
+        if(coult == 1)
+        {
+            usleep(40000);
+        }
+        else
+        {
+            usleep(400000);
+        }
+#endif
+        if (!(_kernel_para.force_flags & GMX_FORCE_ENERGY))
+        {
+            // host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+            // host_out_param[FUNC_TYPE] = FUNC_NO_ENER;
+            // host_out_param[FUNC_I] = coult;
+            // host_out_param[FUNC_J] = vdwt;
+            // host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
+            // host_func_para.nbl = &_kernel_para.other_nbl; // read only
+            // host_func_para.nbat = &_kernel_para.other_nbat; // read only
+            // host_func_para.ic = _kernel_para.ic;      // read only
+            // host_func_para.shift_vec = _kernel_para.other_shift_vec; // read only
+            // host_func_para.f = _kernel_para.other_f; // write only, reduce FIN
+            // host_func_para.expand_Vvdw = NULL;// write only, reduce FIN
+            // host_func_para.expand_Vc = NULL;// write only, reduce FIN
+            // host_func_para.expand_fshift = _kernel_para.expand_fshift;// write only, reduce FIN
+            // host_func_para.tabq_coul_F = _kernel_para.other_tabq_coul_F;// read only
+            // host_func_para.tabq_coul_V = _kernel_para.other_tabq_coul_V;// read only
+            // host_func_para.tabq_coul_FDV0 = _kernel_para.other_tabq_coul_FDV0;// read only
+            // host_func_para.f_start = _kernel_para.f_start;
+            // host_func_para.f_end   = _kernel_para.f_end;
+            // notice_device();
+            wait_device();
+
+            /* Don't calculate energies */
+            //fake_device_run();
+            //p_nbk_c_noener[coult][vdwt]();
+
+        }
+        else if (out->nV == 1)
+        {
+            /* No energy groups */
+            // out->Vvdw[0] = 0;
+            // out->Vc[0]   = 0;
+
+            // _kernel_para.expand_Vvdw   = (real*)malloc(64*sizeof(real));
+            // _kernel_para.expand_Vc     = (real*)malloc(64*sizeof(real));
+
+            // host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+            // host_out_param[FUNC_TYPE] = FUNC_ENER;
+            // host_out_param[FUNC_I] = coult;
+            // host_out_param[FUNC_J] = vdwt;
+            // host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
+            // host_func_para.nbl = &_kernel_para.other_nbl;
+            // host_func_para.nbat = &_kernel_para.other_nbat;
+            // host_func_para.ic = _kernel_para.ic;
+            // host_func_para.shift_vec = _kernel_para.other_shift_vec;
+            // host_func_para.f = _kernel_para.other_f;
+            // host_func_para.expand_Vvdw = _kernel_para.expand_Vvdw;
+            // host_func_para.expand_Vc = _kernel_para.expand_Vc;
+            // host_func_para.expand_fshift = _kernel_para.expand_fshift;
+            // host_func_para.tabq_coul_F = _kernel_para.other_tabq_coul_F;
+            // host_func_para.tabq_coul_V = _kernel_para.other_tabq_coul_V;
+            // host_func_para.tabq_coul_FDV0 = _kernel_para.other_tabq_coul_FDV0;
+            // host_func_para.f_start = _kernel_para.f_start;
+            // host_func_para.f_end   = _kernel_para.f_end;
+            // notice_device();
+            wait_device();
+
+            //fake_device_run();
+            //p_nbk_c_ener[coult][vdwt]();
+
+            // reduce Vvdw
+            int i;
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                _kernel_para.expand_Vvdw[i+1] += _kernel_para.expand_Vvdw[i];
+            }
+            out->Vvdw[0] = _kernel_para.expand_Vvdw[63];
+            free(_kernel_para.expand_Vvdw);
+            // reduce Vc
+            for(i = 0; i < 64 - 1; ++i)
+            {
+                _kernel_para.expand_Vc[i+1] += _kernel_para.expand_Vc[i];
+            }
+            out->Vc[0] = _kernel_para.expand_Vc[63];
+            free(_kernel_para.expand_Vc);
+        }
+        else
+        {
+            /* Calculate energy group contributions */
+            int i;
+
+            // for (i = 0; i < out->nV; i++)
+            // {
+            //     out->Vvdw[i] = 0;
+            // }
+            // for (i = 0; i < out->nV; i++)
+            // {
+            //     out->Vc[i] = 0;
+            // }
+
+            // _kernel_para.expand_Vvdw   = (real*)malloc(out->nV*64*sizeof(real));
+            // _kernel_para.expand_Vc     = (real*)malloc(out->nV*64*sizeof(real));
+
+            // host_out_param[PARAM_DEVICE_ACTION] = DEVICE_ACTION_RUN;
+            // host_out_param[FUNC_TYPE] = FUNC_ENERGRP;
+            // host_out_param[FUNC_I] = coult;
+            // host_out_param[FUNC_J] = vdwt;
+            // host_out_param[FUNC_PARAM_PTR] = (long)&host_func_para;
+            // host_func_para.nbl = &_kernel_para.other_nbl;
+            // host_func_para.nbat = &_kernel_para.other_nbat;
+            // host_func_para.ic = _kernel_para.ic;
+            // host_func_para.shift_vec = _kernel_para.other_shift_vec;
+            // host_func_para.f = _kernel_para.other_f;
+            // host_func_para.expand_Vvdw = _kernel_para.expand_Vvdw;
+            // host_func_para.expand_Vc = _kernel_para.expand_Vc;
+            // host_func_para.expand_fshift = _kernel_para.expand_fshift;
+            // host_func_para.tabq_coul_F = _kernel_para.other_tabq_coul_F;
+            // host_func_para.tabq_coul_V = _kernel_para.other_tabq_coul_V;
+            // host_func_para.tabq_coul_FDV0 = _kernel_para.other_tabq_coul_FDV0;
+            // host_func_para.f_start = _kernel_para.f_start;
+            // host_func_para.f_end   = _kernel_para.f_end;
+
+            // notice_device();
             wait_device();
 
             //fake_device_run();
@@ -733,85 +1042,92 @@ nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
             {
                 for (j = 0; j < out->nV; j++)
                 {
-                    expand_Vvdw[(i+1)*out->nV+j] += expand_Vvdw[(i)*out->nV+j];
+                    _kernel_para.expand_Vvdw[(i+1)*out->nV+j] += _kernel_para.expand_Vvdw[(i)*out->nV+j];
                 }
             }
             for (j = 0; j < out->nV; j++)
             {
-                out->Vvdw[j] = expand_Vvdw[(63)*out->nV+j];
+                out->Vvdw[j] = _kernel_para.expand_Vvdw[(63)*out->nV+j];
             }
-            free(expand_Vvdw);
+            free(_kernel_para.expand_Vvdw);
 
             // reduce Vc
             for(i = 0; i < 64 - 1; ++i)
             {
                 for (j = 0; j < out->nV; j++)
                 {
-                    expand_Vc[(i+1)*out->nV+j] += expand_Vc[(i)*out->nV+j];
+                    _kernel_para.expand_Vc[(i+1)*out->nV+j] += _kernel_para.expand_Vc[(i)*out->nV+j];
                 }
             }
             for (j = 0; j < out->nV; j++)
             {
-                out->Vc[j] = expand_Vc[(63)*out->nV+j];
+                out->Vc[j] = _kernel_para.expand_Vc[(63)*out->nV+j];
             }
-            free(expand_Vc);
+            free(_kernel_para.expand_Vc);
         }
-#ifdef DEBUG_FPEX
-        TLOG("MOee 2.\n");
-        wait_device();
-#endif
+
         // reduce fshift
         int i, j;
         for(i = 0; i < 64 - 1; ++i)
         {
             for(j = 0; j < SHIFTS*DIM; ++j)
             {
-                expand_fshift[(i+1)*SHIFTS*DIM+j] += expand_fshift[(i)*SHIFTS*DIM+j];
+                _kernel_para.expand_fshift[(i+1)*SHIFTS*DIM+j] += _kernel_para.expand_fshift[(i)*SHIFTS*DIM+j];
             }
         }
-#ifdef DEBUG_FPEX
-        TLOG("MOee 3.\n");
-        wait_device();
-#endif
         for(j = 0; j < SHIFTS*DIM; ++j)
         {
-            fshift_p[j] += expand_fshift[63*SHIFTS*DIM+j];
+            _kernel_para.fshift_p[j] += _kernel_para.expand_fshift[63*SHIFTS*DIM+j];
         }
-        free(expand_fshift);
-#ifdef DEBUG_FPEX
-        TLOG("MOee 4.\n");
-        wait_device();
-#endif
-        //wallcycle_sub_start(wcycle, ewcsMEMCPY);
-        memcpy(out->f, other_f, nbat->natoms*nbat->fstride*sizeof(real));
-        free(other_f);
+        
 
-        deep_copy_nbl(nbl[nb], &other_nbl, 0, 1);
+        memcpy(out->f, _kernel_para.other_f, 
+               _kernel_para.nbat->natoms*_kernel_para.nbat->fstride*sizeof(real));
+        deep_copy_nbl(nbl[nb], &_kernel_para.other_nbl, 0, 1);
+        deep_copy_nbat(_kernel_para.nbat, &_kernel_para.other_nbat, 0, 1);
 
-        deep_copy_nbat(nbat, &other_nbat, 0, 1);
-#ifdef DEBUG_FPEX
-        TLOG("MOee 5.\n");
-        wait_device();
-#endif
-        free(other_shift_vec);
-
+        free(_kernel_para.expand_fshift);
+        free(_kernel_para.other_f);
+        free(_kernel_para.other_shift_vec);
 #ifndef GMX_DOUBLE
-        free(other_tabq_coul_FDV0);
+        free(_kernel_para.other_tabq_coul_FDV0);
 #else
-        free(other_tabq_coul_F);
-        free(other_tabq_coul_V);
+        free(_kernel_para.other_tabq_coul_F);
+        free(_kernel_para.other_tabq_coul_V);
 #endif
-        //wallcycle_sub_stop(wcycle, ewcsMEMCPY);
-        free(f_start);
-        free(f_end);
-#ifdef DEBUG_FPEX
-        TLOG("MOee 6.\n");
-        wait_device();
-#endif
+        free(_kernel_para.f_start);
+        free(_kernel_para.f_end);
     }
 
-    if (force_flags & GMX_FORCE_ENERGY)
+    if (_kernel_para.force_flags & GMX_FORCE_ENERGY)
     {
-        reduce_energies_over_lists(nbat, nnbl, Vvdw, Vc);
+        reduce_energies_over_lists(_kernel_para.nbat, nnbl, _kernel_para.Vvdw, _kernel_para.Vc);
     }
+}
+
+void
+nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
+                 const nbnxn_atomdata_t     *nbat,
+                 const interaction_const_t  *ic,
+                 rvec                       *shift_vec,
+                 int                         force_flags,
+                 int                         clearF,
+                 real                       *fshift,
+                 real                       *Vc,
+                 real                       *Vvdw,
+                 gmx_wallcycle_t             wcycle)
+{
+    _kernel_para.nbl_list    = nbl_list;
+    _kernel_para.nbat        = nbat;
+    _kernel_para.ic          = ic;
+    _kernel_para.shift_vec   = shift_vec;
+    _kernel_para.force_flags = force_flags;
+    _kernel_para.clearF      = clearF;
+    _kernel_para.fshift      = fshift;
+    _kernel_para.Vc          = Vc;
+    _kernel_para.Vvdw        = Vvdw;
+    _kernel_para.wcycle      = wcycle;
+
+    nbnxn_kernel_ref_launch();
+    nbnxn_kernel_ref_reduce();
 }
