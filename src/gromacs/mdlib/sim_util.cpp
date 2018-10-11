@@ -1191,18 +1191,10 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
 #ifdef FORCE_OVERLAP
     /* reduce local nonbonded F on SW */
     wallcycle_sub_start_nocount(wcycle, ewcsNONBONDED);
+    wallcycle_sub_start(wcycle, ewcsWAIT1);
     nbnxn_kernel_ref_reduce();
+    wallcycle_sub_stop(wcycle, ewcsWAIT1);
     wallcycle_sub_stop(wcycle, ewcsNONBONDED);
-    if (!bUseOrEmulGPU || bDiffKernels)
-    {
-    if (DOMAINDECOMP(cr))
-    {
-        /* launch non-local nonbonded F on SW */
-        do_nb_verlet(fr, ic, enerd, flags, eintNonlocal,
-                            bDiffKernels ? enbvClearFYes : enbvClearFNo,
-                            nrnb, wcycle);
-    }
-    }
 #endif
 
     if (fr->efep != efepNO)
@@ -1233,6 +1225,19 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
     {
         update_QMMMrec(cr, fr, x, mdatoms, box, top);
     }
+
+#ifdef FORCE_OVERLAP
+    if (!bUseOrEmulGPU || bDiffKernels)
+    {
+    if (DOMAINDECOMP(cr))
+    {
+        /* launch non-local nonbonded F on SW */
+        do_nb_verlet(fr, ic, enerd, flags, eintNonlocal,
+                            bDiffKernels ? enbvClearFYes : enbvClearFNo,
+                            nrnb, wcycle);
+    }
+    }
+#endif
 
     /* Compute the bonded and non-bonded energies and optionally forces */
     do_force_lowlevel(fr, inputrec, &(top->idef),
@@ -1275,8 +1280,10 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                          nrnb, wcycle);
 #else
             wallcycle_sub_start_nocount(wcycle, ewcsNONBONDED);
+            wallcycle_sub_start(wcycle, ewcsWAIT2);
             /* reduce non-local nonbonded F on SW */
             nbnxn_kernel_ref_reduce();
+            wallcycle_sub_stop(wcycle, ewcsWAIT2);
             wallcycle_sub_stop(wcycle, ewcsNONBONDED);
 #endif
         }

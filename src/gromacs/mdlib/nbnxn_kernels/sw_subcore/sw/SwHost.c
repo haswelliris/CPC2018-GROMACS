@@ -8,7 +8,7 @@ volatile long host_out_param[PARAM_SIZE];
 volatile long host_in_param[PARAM_SIZE];
 volatile long host_notice_counter;
 struct InitParam host_param;
-int load_balance_step = 1;
+int load_balance_step = 16;
 
 
 extern void SLAVE_FUN(device_main)();
@@ -48,7 +48,7 @@ void init_device()
     if (load_balance_step_str != NULL)
         load_balance_step = atoi(load_balance_step_str);
     if (load_balance_step == 0)
-        load_balance_step = 1;
+        load_balance_step = 16;
     TLOG("LOAD BALANCE STEP =%d\n", load_balance_step);
 }
 
