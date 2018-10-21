@@ -120,6 +120,14 @@
 #include "corewrap.h"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "gromacs/mdlib/nbnxn_kernels/sw_subcore/sw/SwHost.h"
+#ifdef __cplusplus
+}
+#endif
+
 static void reset_all_counters(FILE *fplog, t_commrec *cr,
                                gmx_int64_t step,
                                gmx_int64_t *step_rel, t_inputrec *ir,
@@ -666,6 +674,8 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
      *
      ************************************************************/
 
+    init_device();
+
     /* if rerunMD then read coordinates and velocities from input trajectory */
     if (bRerunMD)
     {
@@ -742,17 +752,21 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
     /* and stop now if we should */
     bLastStep = (bRerunMD || (ir->nsteps >= 0 && step_rel > ir->nsteps) ||
                  ((multisim_nsteps >= 0) && (step_rel >= multisim_nsteps )));
+
+
     //fgn : add this to decrease step
     int fgn_step_count = 0;
     char *fgn_step_size_str = getenv("GROMACS_STEP");
     int fgn_step_size = 0;
     if (fgn_step_size_str != NULL)
         fgn_step_size = atoi(fgn_step_size_str);
+
     while (!bLastStep || (bRerunMD && bNotLastFrame))
     {
         //fgn : control the step at here !
         if (fgn_step_size!=0 && fgn_step_count == fgn_step_size) break;
         else fgn_step_count++;
+
         /* Determine if this is a neighbor search step */
         bNStList = (ir->nstlist > 0  && step % ir->nstlist == 0);
 
@@ -1802,6 +1816,9 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
 
     }
     /* End of main MD loop */
+
+    release_device();
+
     debug_gmx();
 
     /* Closing TNG files can include compressing data. Therefore it is good to do that

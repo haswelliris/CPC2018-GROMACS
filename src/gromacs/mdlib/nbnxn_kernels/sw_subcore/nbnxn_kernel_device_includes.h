@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -33,34 +33,26 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-#ifndef _nbnxn_kernel_ref_h
-#define _nbnxn_kernel_ref_h
 
-#include "gromacs/legacyheaders/typedefs.h"
-#include "gromacs/mdlib/nbnxn_pairlist.h"
-#include "gromacs/timing/wallcycle.h"
+/* This file includes all required (non-)energy flavors of the kernel
+ * outer and inner loops, given a Coulomb and VdW treatment.
+ */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/* Include the force only kernels */
+#include "nbnxn_kernel_device_outer.h"
 
-/* Wrapper call for the non-bonded n vs n reference kernels */
-void
-nbnxn_kernel_ref(const nbnxn_pairlist_set_t *nbl_list,
-                 const nbnxn_atomdata_t     *nbat,
-                 const interaction_const_t  *ic,
-                 rvec                       *shift_vec,
-                 int                         force_flags,
-                 int                         clearF,
-                 real                       *fshift,
-                 real                       *Vc,
-                 real                       *Vvdw,
-                 gmx_wallcycle_t             wcycle);
+/* Include the force+energy kernels */
+#define CALC_ENERGIES
+#include "nbnxn_kernel_device_outer.h"
+#undef CALC_ENERGIES
 
-void nbnxn_kernel_ref_reduce();
+/* Include the force+energygroups kernels */
+#ifdef SW_ENERGRP /* in SwConfig */
 
-#ifdef __cplusplus
-}
-#endif
+#define CALC_ENERGIES
+#define ENERGY_GROUPS
+#include "nbnxn_kernel_device_outer.h"
+#undef ENERGY_GROUPS
+#undef CALC_ENERGIES
 
 #endif

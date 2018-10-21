@@ -65,6 +65,7 @@ static gmx_bool            g_bOverAllocDD     = FALSE;
 static tMPI_Thread_mutex_t g_over_alloc_mutex = TMPI_THREAD_MUTEX_INITIALIZER;
 
 #ifdef DEBUG
+static tMPI_Thread_mutex_t gmx_logfile_mtx    = TMPI_THREAD_MUTEX_INITIALIZER;
 static void log_action(int bMal, const char *what, const char *file, int line,
                        int nelem, int size, void *ptr)
 {
@@ -166,6 +167,7 @@ void *save_calloc(const char *name, const char *file, int line,
 #ifdef GMX_BROKEN_CALLOC
         /* emulate calloc(3) with malloc/memset on machines with
            a broken calloc, e.g. in -lgmalloc on cray xt3. */
+        //if ((p = malloc((size_t)nelem*(size_t)elsize)) == NULL)
         if ((p = malloc((size_t)nelem*(size_t)elsize)) == NULL)
         {
             gmx_fatal(errno, __FILE__, __LINE__,

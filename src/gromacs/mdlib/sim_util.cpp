@@ -98,6 +98,14 @@
 #include "adress.h"
 #include "nbnxn_gpu.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "gromacs/mdlib/nbnxn_kernels/sw_subcore/sw/SwHost.h"
+#ifdef __cplusplus
+}
+#endif
+
 void print_time(FILE                     *out,
                 gmx_walltime_accounting_t walltime_accounting,
                 gmx_int64_t               step,
@@ -497,7 +505,11 @@ static void do_nb_verlet(t_forcerec *fr,
                              enerd->grpp.ener[egCOULSR],
                              fr->bBHAM ?
                              enerd->grpp.ener[egBHAMSR] :
-                             enerd->grpp.ener[egLJSR]);
+                             enerd->grpp.ener[egLJSR],
+                             wcycle);
+#ifndef FORCE_OVERLAP
+            nbnxn_kernel_ref_reduce();
+#endif
             break;
 
         case nbnxnk4xN_SIMD_4xN:
@@ -965,6 +977,13 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                      nrnb, wcycle);
         wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
     }
+#ifdef FORCE_OVERLAP
+    /* launch local nonbonded F on SW */
+    wallcycle_start(wcycle, ewcFORCE);
+    do_nb_verlet(fr, ic, enerd, flags, eintLocal, enbvClearFYes,
+                 nrnb, wcycle);
+    cycles_force += wallcycle_stop(wcycle, ewcFORCE);
+#endif
 
     /* Communicate coordinates and sum dipole if necessary +
        do non-local pair search */
@@ -1110,7 +1129,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
      * No parallel communication should occur while this counter is running,
      * since that will interfere with the dynamic load balancing.
      */
-    wallcycle_start(wcycle, ewcFORCE);
+    wallcycle_start_nocount(wcycle, ewcFORCE);
     if (bDoForces)
     {
         /* Reset forces for which the virial is calculated separately:
@@ -1161,13 +1180,22 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
      * force calculation imbalance can be balanced out by the domain
      * decomposition load balancing.
      */
-
+#ifndef FORCE_OVERLAP
     if (!bUseOrEmulGPU)
     {
         /* Maybe we should move this into do_force_lowlevel */
         do_nb_verlet(fr, ic, enerd, flags, eintLocal, enbvClearFYes,
                      nrnb, wcycle);
     }
+#endif
+#ifdef FORCE_OVERLAP
+    /* reduce local nonbonded F on SW */
+    wallcycle_sub_start_nocount(wcycle, ewcsNONBONDED);
+    wallcycle_sub_start(wcycle, ewcsWAIT1);
+    nbnxn_kernel_ref_reduce();
+    wallcycle_sub_stop(wcycle, ewcsWAIT1);
+    wallcycle_sub_stop(wcycle, ewcsNONBONDED);
+#endif
 
     if (fr->efep != efepNO)
     {
@@ -1192,15 +1220,72 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         }
     }
 
+    /* update QMMMrec, if necessary */
+    if (fr->bQMMM)
+    {
+        update_QMMMrec(cr, fr, x, mdatoms, box, top);
+    }
+
+#ifdef FORCE_OVERLAP
+    if (!bUseOrEmulGPU || bDiffKernels)
+    {
+    if (DOMAINDECOMP(cr))
+    {
+        /* launch non-local nonbonded F on SW */
+        do_nb_verlet(fr, ic, enerd, flags, eintNonlocal,
+                            bDiffKernels ? enbvClearFYes : enbvClearFNo,
+                            nrnb, wcycle);
+    }
+    }
+#endif
+
+    /* Compute the bonded and non-bonded energies and optionally forces */
+    do_force_lowlevel(fr, inputrec, &(top->idef),
+                      cr, nrnb, wcycle, mdatoms,
+                      x, hist, f, bSepLRF ? fr->f_twin : f, enerd, fcd, top, fr->born,
+                      bBornRadii, box,
+                      inputrec->fepvals, lambda, graph, &(top->excls), fr->mu_tot,
+                      flags, &cycles_pme);
+
+    if (bSepLRF)
+    {
+        if (do_per_step(step, inputrec->nstcalclr))
+        {
+            /* Add the long range forces to the short range forces */
+            for (i = 0; i < fr->natoms_force_constr; i++)
+            {
+                rvec_add(fr->f_twin[i], f[i], f[i]);
+            }
+        }
+    }
+
+    cycles_force += wallcycle_stop(wcycle, ewcFORCE);
+
+    if (ed)
+    {
+        do_flood(cr, inputrec, x, f, ed, box, step, bNS);
+    }
+
+    wallcycle_start_nocount(wcycle, ewcFORCE);
+    // here compute nonlocal nonbonded F
     if (!bUseOrEmulGPU || bDiffKernels)
     {
         int aloc;
 
         if (DOMAINDECOMP(cr))
         {
+#ifndef FORCE_OVERLAP
             do_nb_verlet(fr, ic, enerd, flags, eintNonlocal,
                          bDiffKernels ? enbvClearFYes : enbvClearFNo,
                          nrnb, wcycle);
+#else
+            wallcycle_sub_start_nocount(wcycle, ewcsNONBONDED);
+            wallcycle_sub_start(wcycle, ewcsWAIT2);
+            /* reduce non-local nonbonded F on SW */
+            nbnxn_kernel_ref_reduce();
+            wallcycle_sub_stop(wcycle, ewcsWAIT2);
+            wallcycle_sub_stop(wcycle, ewcsNONBONDED);
+#endif
         }
 
         if (!bUseOrEmulGPU)
@@ -1235,38 +1320,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         }
     }
 
-    /* update QMMMrec, if necessary */
-    if (fr->bQMMM)
-    {
-        update_QMMMrec(cr, fr, x, mdatoms, box, top);
-    }
-
-    /* Compute the bonded and non-bonded energies and optionally forces */
-    do_force_lowlevel(fr, inputrec, &(top->idef),
-                      cr, nrnb, wcycle, mdatoms,
-                      x, hist, f, bSepLRF ? fr->f_twin : f, enerd, fcd, top, fr->born,
-                      bBornRadii, box,
-                      inputrec->fepvals, lambda, graph, &(top->excls), fr->mu_tot,
-                      flags, &cycles_pme);
-
-    if (bSepLRF)
-    {
-        if (do_per_step(step, inputrec->nstcalclr))
-        {
-            /* Add the long range forces to the short range forces */
-            for (i = 0; i < fr->natoms_force_constr; i++)
-            {
-                rvec_add(fr->f_twin[i], f[i], f[i]);
-            }
-        }
-    }
-
     cycles_force += wallcycle_stop(wcycle, ewcFORCE);
-
-    if (ed)
-    {
-        do_flood(cr, inputrec, x, f, ed, box, step, bNS);
-    }
 
     if (bUseOrEmulGPU && !bDiffKernels)
     {
