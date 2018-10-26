@@ -753,7 +753,6 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
     bLastStep = (bRerunMD || (ir->nsteps >= 0 && step_rel > ir->nsteps) ||
                  ((multisim_nsteps >= 0) && (step_rel >= multisim_nsteps )));
 
-
     //fgn : add this to decrease step
     int fgn_step_count = 0;
     char *fgn_step_size_str = getenv("GROMACS_STEP");
